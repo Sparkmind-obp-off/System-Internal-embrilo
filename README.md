@@ -16,7 +16,7 @@ Internal console for Embrilo's AI-assisted, human-reviewed content service. It r
 | Private R2 uploads + short-lived download links | ✅ implemented · ✅ tested (local R2) |
 | Genspark automated API/connector/MCP | ⛔ **not verified** — no automated adapter exists |
 | Cloudflare Access in front of the console | ⏳ not configured (recommended) |
-| Production deployment | see [Deployment](#deployment) — only claimed when verified |
+| Production deployment | ✅ https://embrilo-os.pages.dev — deployed and smoke-tested 2026-10-27 |
 
 Details and evidence: [`docs/08-implementation-status.md`](docs/08-implementation-status.md). Connector contract: [`docs/09-connector-contract.md`](docs/09-connector-contract.md).
 

@@ -50,9 +50,15 @@ End-to-end smoke test `scripts/smoke.mjs` (21 checks) passed against local `wran
 | Date (UTC) | Step | Result |
 |---|---|---|
 | 2026-10-27 | Cloudflare auth via user API token (BYOK) | ✅ `wrangler whoami` OK |
-| 2026-10-27 | `wrangler r2 bucket create embrilo-os-private` | ✅ created (private, empty, no public access) |
-| 2026-10-27 | `wrangler d1 create embrilo-os-production` | ⛔ **blocked**: `System limit reached: databases per account (10) [code: 7406]` |
-| — | Pages project, secrets, remote migrations, deploy, smoke test | ⏳ not started (needs D1) |
+| 2026-10-27 | R2 bucket `embrilo-os-private` | ✅ created (private, no public access) |
+| 2026-10-27 | First `d1 create` attempt | ⛔ account limit (10); owner freed a slot |
+| 2026-10-27 | D1 `embrilo-os-production` + remote migration `0001` | ✅ 32 statements applied |
+| 2026-10-27 | Pages project `embrilo-os` (production branch `main`) | ✅ created |
+| 2026-10-27 | Secrets `CONNECTOR_HMAC_SECRET`, `CUSTOMER_TOKEN_SECRET`, `DOWNLOAD_SIGNING_SECRET` | ✅ set (encrypted in Cloudflare; values not in Git) |
+| 2026-10-27 | `wrangler pages deploy dist --branch main` | ✅ deployed |
+| 2026-10-27 | First ADMIN operator created via `scripts/create-operator.mjs` (hash only in D1) | ✅ |
+| 2026-10-27 | `scripts/smoke.mjs` against https://embrilo-os.pages.dev | ✅ 21/21 checks passed |
 
-**Status: NOT deployed. No production URL exists.**
-Next action (owner): free one D1 slot (delete a D1 database you no longer need) or raise the account's D1 limit. Then continue from step 1 of the README deployment checklist. The app is never pointed at another project's database.
+**Status: deployed and verified** at https://embrilo-os.pages.dev (login: `/login`).
+Note: the smoke test left one synthetic request (`EMB-AP2W7-GJ4FN`, customer "Smoke Test (synthetic)") in production; an admin can cancel it.
+Not yet done: Cloudflare Access in front of `/console*` and `/login` (recommended).
