@@ -96,9 +96,19 @@ export function requireRole(op: OperatorCtx | undefined, ...roles: Role[]): Oper
  * synchronizer token (form field `_csrf` or header `X-CSRF-Token`) + Origin check.
  * SameSite=Strict cookies are an additional layer, not the only one.
  */
-export function verifyCsrf(c: Context<AppEnv>, provided: string | undefined) {
+/**
+ * True only for a request that is positively cross-site. Browsers may send `Origin: null`
+ * for same-origin form posts (privacy settings / referrer policy), so "null" alone is not
+ * treated as cross-site — the mandatory CSRF token still protects those requests.
+ */
+export function isCrossSite(c: Context): boolean {
+  if ((c.req.header('sec-fetch-site') ?? '') === 'cross-site') return true
   const origin = c.req.header('origin')
-  if (origin && origin !== new URL(c.req.url).origin) throw new AppError(403, 'bad_origin', 'Cross-origin request rejected')
+  return !!origin && origin !== 'null' && origin !== new URL(c.req.url).origin
+}
+
+export function verifyCsrf(c: Context<AppEnv>, provided: string | undefined) {
+  if (isCrossSite(c)) throw new AppError(403, 'bad_origin', 'Cross-origin request rejected')
   const expected = c.get('csrf')
   if (!expected || !provided || !timingSafeEqual(provided, expected))
     throw new AppError(403, 'csrf_failed', 'Security token missing or invalid; reload the page and retry')

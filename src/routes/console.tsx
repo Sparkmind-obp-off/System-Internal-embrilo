@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
-import { createSession, destroySession, requireOperator, requireRole, verifyCsrf, MAX_FAILED_LOGINS, LOCKOUT_MS } from '../lib/auth'
+import { createSession, destroySession, requireOperator, requireRole, verifyCsrf, isCrossSite } from '../lib/auth'
+import { MAX_FAILED_LOGINS, LOCKOUT_MS } from '../lib/auth'
 import { DUMMY_PASSWORD_HASH, randomToken, timingSafeEqual, verifyPassword } from '../lib/crypto'
 import { AppError, notFound } from '../lib/errors'
 import { nowIso } from '../lib/db'
@@ -26,7 +27,14 @@ consoleApp.get('/login', (c) => {
   if (c.get('operator')) return c.redirect('/console', 303)
   const token = randomToken(18)
   setCookie(c, LOGIN_CSRF, token, { httpOnly: true, sameSite: 'Strict', path: '/login', secure: new URL(c.req.url).protocol === 'https:', maxAge: 1800 })
-  return c.html(<LoginPage csrf={token} err={c.req.query('err') ? 'Invalid email or password, or account temporarily locked.' : undefined} />)
+  const e = c.req.query('err')
+  const msg =
+    e === 'expired'
+      ? 'The login form expired or your browser blocked its security cookie. Please try again (allow cookies for this site).'
+      : e
+        ? 'Invalid email or password, or account temporarily locked (5 failed attempts = 15 minutes).'
+        : undefined
+  return c.html(<LoginPage csrf={token} err={msg} />)
 })
 
 consoleApp.post('/login', async (c) => {
@@ -34,11 +42,12 @@ consoleApp.post('/login', async (c) => {
   await rateLimit(c.env.DB, `login-ip:${ip}`, 20, 900)
   const input = await readInput(c)
   // Login CSRF: double-submit token + same-origin check.
-  const origin = c.req.header('origin')
   const cookieTok = getCookie(c, LOGIN_CSRF) ?? ''
   const formTok = typeof input._lcsrf === 'string' ? input._lcsrf : ''
-  if ((origin && origin !== new URL(c.req.url).origin) || !cookieTok || !timingSafeEqual(cookieTok, formTok))
-    throw new AppError(403, 'csrf_failed', 'Login form expired; reload and try again')
+  if (isCrossSite(c) || !cookieTok || !timingSafeEqual(cookieTok, formTok)) {
+    // Friendly recovery instead of a dead-end error page: reissue a fresh form.
+    return c.redirect('/login?err=expired', 303)
+  }
 
   const email = typeof input.email === 'string' ? input.email.trim().toLowerCase().slice(0, 254) : ''
   const password = typeof input.password === 'string' ? input.password.slice(0, 256) : ''

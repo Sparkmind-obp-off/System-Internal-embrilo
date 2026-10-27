@@ -52,7 +52,7 @@ export const securityHeaders: MiddlewareHandler<AppEnv> = async (c, next) => {
     )
   h.set('X-Content-Type-Options', 'nosniff')
   h.set('X-Frame-Options', 'DENY')
-  h.set('Referrer-Policy', 'no-referrer')
+  h.set('Referrer-Policy', 'same-origin')
   h.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()')
   h.set('Cross-Origin-Opener-Policy', 'same-origin')
   h.set('Cross-Origin-Resource-Policy', 'same-origin')

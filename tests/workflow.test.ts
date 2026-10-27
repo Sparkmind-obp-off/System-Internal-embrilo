@@ -39,12 +39,41 @@ describe('operator access', () => {
   })
 
   it('login form requires its CSRF token', async () => {
+    const before = (await env.DB.prepare('SELECT COUNT(*) AS n FROM sessions').first<{ n: number }>())!.n
     const res = await call(env, '/login', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded', origin: BASE },
       body: new URLSearchParams({ email: 'operator@example.test', password: PASSWORD })
     })
-    expect(res.status).toBe(403)
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toBe('/login?err=expired')
+    const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM sessions').first<{ n: number }>()
+    expect(row!.n).toBe(before) // no new session was created
+  })
+
+  it('browser form login works when the browser sends Origin: null (regression)', async () => {
+    const page = await call(env, '/login')
+    const lcookie = (page.headers.get('set-cookie') ?? '').split(';')[0]
+    const lcsrf = /name="_lcsrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''
+    const res = await call(env, '/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: lcookie, origin: 'null', 'sec-fetch-site': 'same-origin' },
+      body: new URLSearchParams({ email: 'Operator@Example.test', password: PASSWORD, _lcsrf: lcsrf })
+    })
+    expect(res.status).toBe(303)
+    expect(res.headers.get('location')).toBe('/console')
+  })
+
+  it('login from a cross-site page is refused even with a token', async () => {
+    const page = await call(env, '/login')
+    const lcookie = (page.headers.get('set-cookie') ?? '').split(';')[0]
+    const lcsrf = /name="_lcsrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''
+    const res = await call(env, '/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: lcookie, origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' },
+      body: new URLSearchParams({ email: 'operator@example.test', password: PASSWORD, _lcsrf: lcsrf })
+    })
+    expect(res.headers.get('location')).toBe('/login?err=expired')
   })
 
   it('state-changing calls require a valid CSRF token and same origin', async () => {
