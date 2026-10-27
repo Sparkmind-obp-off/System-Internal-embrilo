@@ -61,16 +61,16 @@ export function customerStatus(s: JobState): CustomerStatus {
 }
 
 export const STATE_LABEL: Record<JobState, string> = {
-  SUBMITTED: 'Submitted',
-  TRIAGE: 'Triage',
-  QUEUED: 'Queued',
-  IN_PRODUCTION: 'In production',
-  QC_REVIEW: 'QC review',
-  APPROVED: 'Approved',
-  DELIVERED: 'Delivered',
-  NEEDS_INFO: 'Needs info',
-  NEEDS_REVISION: 'Needs revision',
+  SUBMITTED: 'Diterima',
+  TRIAGE: 'Pemeriksaan',
+  QUEUED: 'Dalam antrean',
+  IN_PRODUCTION: 'Sedang diproduksi',
+  QC_REVIEW: 'Tinjauan kualitas',
+  APPROVED: 'Disetujui',
+  DELIVERED: 'Terkirim',
+  NEEDS_INFO: 'Butuh informasi',
+  NEEDS_REVISION: 'Butuh revisi',
   BLOCKED_PROVIDER: 'Blocked (provider)',
-  FAILED: 'Failed',
-  CANCELLED: 'Cancelled'
+  FAILED: 'Gagal',
+  CANCELLED: 'Dibatalkan'
 }
