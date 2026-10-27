@@ -79,7 +79,7 @@ pm2 start ecosystem.config.cjs           # or: npm run dev:sandbox
 ### Checks
 ```bash
 npm run typecheck     # tsc --noEmit
-npm test              # 62 Vitest tests against local D1 + R2 (Miniflare)
+npm test              # 64 Vitest tests against local D1 + R2 (Miniflare)
 npm run build         # vite → dist/_worker.js
 OPERATOR_EMAIL=… OPERATOR_PASSWORD=… BASE_URL=http://localhost:3000 node scripts/smoke.mjs   # 21-step E2E
 ```
