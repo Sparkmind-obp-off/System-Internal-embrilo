@@ -70,7 +70,7 @@ export const STATE_LABEL: Record<JobState, string> = {
   DELIVERED: 'Terkirim',
   NEEDS_INFO: 'Butuh informasi',
   NEEDS_REVISION: 'Butuh revisi',
-  BLOCKED_PROVIDER: 'Blocked (provider)',
+  BLOCKED_PROVIDER: 'Provider terblokir',
   FAILED: 'Gagal',
   CANCELLED: 'Dibatalkan'
 }
