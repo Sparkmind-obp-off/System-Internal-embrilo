@@ -116,7 +116,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                     <Csrf token={csrf} />
                     <input type="hidden" name="action" value="queue" />
                     <label>
-                      Priority
+                      Prioritas
                       <select name="priority">
                         {PRIORITIES.map((p) => (
                           <option value={p} selected={p === job.priority}>
@@ -175,7 +175,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                       <div class="row between">
                         <strong>Prompt yang sudah disanitasi · {runningRun.template_version}</strong>
                         <button type="button" class="btn small" data-copy="#prompt-text">
-                          Copy prompt
+                          Salin prompt
                         </button>
                       </div>
                       <textarea id="prompt-text" readonly rows={14}>
@@ -204,7 +204,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                     )}
                     <div class="row">
                       <label>
-                        Operator minutes
+                        Durasi kerja operator (menit)
                         <input type="number" name="operator_minutes" min={0} max={10000} />
                       </label>
                       <label>
@@ -267,10 +267,10 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                   </label>
                   <div class="row">
                     <button class="btn primary" name="decision" value="APPROVE">
-                      Approve
+                      Setujui
                     </button>
                     <button class="btn" name="decision" value="REQUEST_REVISION">
-                      Request revision
+                      Minta revisi
                     </button>
                   </div>
                 </form>
@@ -315,19 +315,19 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
               <form method="post" action={`${base}/brief`} class="stack">
                 <Csrf token={csrf} />
                 <label>
-                  Objective
+                  Tujuan
                   <textarea name="objective" rows={2} maxlength={2000} required>
                     {brief.objective}
                   </textarea>
                 </label>
                 <label>
-                  Audience
+                  Audiens
                   <textarea name="audience" rows={2} maxlength={1000} required>
                     {brief.audience}
                   </textarea>
                 </label>
                 <label>
-                  Product facts (verified)
+                  Fakta produk (verified)
                   <textarea name="product_facts" rows={4} maxlength={5000} required>
                     {brief.product_facts}
                   </textarea>
@@ -342,7 +342,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                 </fieldset>
                 <div class="row">
                   <label>
-                    Language
+                    Bahasa
                     <select name="language">
                       {LANGUAGES.map((l) => (
                         <option value={l} selected={l === brief.language}>
@@ -352,16 +352,16 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                     </select>
                   </label>
                   <label>
-                    Tone
+                    Gaya bahasa
                     <input type="text" name="tone" value={brief.tone} maxlength={300} />
                   </label>
                   <label>
-                    CTA
+                    Ajakan bertindak
                     <input type="text" name="cta" value={brief.cta} maxlength={300} />
                   </label>
                 </div>
                 <label>
-                  Constraints / prohibited claims
+                  Batasan / prohibited claims
                   <textarea name="constraints" rows={2} maxlength={2000}>
                     {brief.constraints}
                   </textarea>
@@ -387,7 +387,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                 <dd>{brief.product_facts}</dd>
                 <dt>Platform</dt>
                 <dd>{brief.platforms.join(', ')}</dd>
-                <dt>Bahasa / gaya / CTA</dt>
+                <dt>Bahasa / gaya / Ajakan bertindak</dt>
                 <dd>
                   {brief.language} / {brief.tone || '—'} / {brief.cta || '—'}
                 </dd>
@@ -416,7 +416,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                   </select>
                 </label>
                 <label>
-                  Priority
+                  Prioritas
                   <select name="priority">
                     {PRIORITIES.map((p) => (
                       <option value={p} selected={p === job.priority}>
