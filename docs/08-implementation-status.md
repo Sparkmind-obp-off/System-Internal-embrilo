@@ -45,3 +45,14 @@ End-to-end smoke test `scripts/smoke.mjs` (21 checks) passed against local `wran
 - Queues/background jobs, email notifications, payments, auto-publishing.
 - OpenAPI document (the contract is described in `docs/09-connector-contract.md`).
 - Data retention/deletion jobs (needs a policy decision; no cron is used).
+
+## Deployment record
+| Date (UTC) | Step | Result |
+|---|---|---|
+| 2026-10-27 | Cloudflare auth via user API token (BYOK) | ✅ `wrangler whoami` OK |
+| 2026-10-27 | `wrangler r2 bucket create embrilo-os-private` | ✅ created (private, empty, no public access) |
+| 2026-10-27 | `wrangler d1 create embrilo-os-production` | ⛔ **blocked**: `System limit reached: databases per account (10) [code: 7406]` |
+| — | Pages project, secrets, remote migrations, deploy, smoke test | ⏳ not started (needs D1) |
+
+**Status: NOT deployed. No production URL exists.**
+Next action (owner): free one D1 slot (delete a D1 database you no longer need) or raise the account's D1 limit. Then continue from step 1 of the README deployment checklist. The app is never pointed at another project's database.
