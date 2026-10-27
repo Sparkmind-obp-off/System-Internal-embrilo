@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "embrilo-os",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages_build_output_dir": "./dist",
+  // Non-secret configuration only. Secrets go in `.dev.vars` (local) or
+  // `wrangler pages secret put` (production). Never commit secret values.
+  "vars": {
+    "APP_ENV": "development",
+    "CONNECTOR_KEY_ID": "public-embrilo-v1",
+    "MAX_REVISION_ROUNDS": "2"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "embrilo-os-production",
+      // Placeholder for local dev. Replace with the real ID from `wrangler d1 create`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "R2", "bucket_name": "embrilo-os-private" }
+  ]
+}

@@ -1,0 +1,7 @@
+# Copy to .dev.vars for LOCAL development only. .dev.vars is gitignored.
+# Generate values with:  node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+CONNECTOR_HMAC_SECRET=replace-with-at-least-32-random-chars
+CUSTOMER_TOKEN_SECRET=replace-with-at-least-32-random-chars
+DOWNLOAD_SIGNING_SECRET=replace-with-at-least-32-random-chars
+# Optional, for key rotation:
+# CONNECTOR_HMAC_SECRET_PREVIOUS=

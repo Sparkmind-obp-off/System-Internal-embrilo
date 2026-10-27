@@ -1,0 +1,31 @@
+# Dependencies & build
+node_modules/
+dist/
+.wrangler/
+coverage/
+
+# Secrets / env — NEVER commit (repository is public)
+.env
+.env.*
+.dev.vars
+!.dev.vars.example
+*.pem
+*.key
+
+# Local-only generated files (operator bootstrap SQL, exports, real data)
+.local/
+exports/
+private/
+
+# Logs / PM2
+.pm2/
+pids/
+logs/
+*.log
+
+# Archives / backups
+*.backup
+*.bak
+*.tar.gz
+*.zip
+.DS_Store
