@@ -82,30 +82,30 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
         </p>
       </header>
       <Flash ok={ok} err={err} />
-      {!w && <p class="callout">Read-only role: actions are hidden and also blocked on the server.</p>}
+      {!w && <p class="callout">Peran hanya-baca: tindakan disembunyikan dan tetap diblokir oleh server.</p>}
 
       <div class="cols">
         <div class="col-main">
-          {/* ---------------- Next action panel ---------------- */}
+          {/* ---------------- Tindakan berikutnya panel ---------------- */}
           {w && (
             <section class="card" aria-labelledby="actions-title">
-              <h2 id="actions-title">Next action</h2>
+              <h2 id="actions-title">Tindakan berikutnya</h2>
 
               {s === 'SUBMITTED' && (
                 <form method="post" action={`${base}/triage`}>
                   <Csrf token={csrf} />
                   <input type="hidden" name="action" value="start" />
-                  <button class="btn primary">Start triage</button>
+                  <button class="btn primary">Mulai pemeriksaan</button>
                 </form>
               )}
 
               {s === 'NEEDS_INFO' && (
                 <>
-                  <p>Waiting for customer information. Message shown to customer: “{job.customer_message}”.</p>
+                  <p>Menunggu informasi pelanggan. Pesan yang ditampilkan kepada pelanggan: “{job.customer_message}”.</p>
                   <form method="post" action={`${base}/triage`}>
                     <Csrf token={csrf} />
                     <input type="hidden" name="action" value="start" />
-                    <button class="btn">Info received → back to triage</button>
+                    <button class="btn">Informasi diterima → kembali ke pemeriksaan</button>
                   </form>
                 </>
               )}
@@ -128,7 +128,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                     <button class="btn primary" disabled={!brief.rights_confirmed}>
                       Qualify → queue
                     </button>
-                    {!brief.rights_confirmed && <span class="muted">Rights not confirmed — cannot queue.</span>}
+                    {!brief.rights_confirmed && <span class="muted">Hak penggunaan belum dikonfirmasi — pekerjaan belum bisa masuk antrean.</span>}
                   </form>
                   <form method="post" action={`${base}/triage`} class="stack">
                     <Csrf token={csrf} />
@@ -137,7 +137,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                       Message to customer (customer-safe, what is missing)
                       <textarea name="customer_message" rows={2} maxlength={1000} required></textarea>
                     </label>
-                    <button class="btn">Request more info</button>
+                    <button class="btn">Minta informasi tambahan</button>
                   </form>
                 </div>
               )}
@@ -153,14 +153,14 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                       ))}
                     </select>
                   </label>
-                  <button class="btn primary">Start production run</button>
+                  <button class="btn primary">Mulai proses produksi</button>
                 </form>
               )}
 
               {(s === 'FAILED' || s === 'BLOCKED_PROVIDER' || s === 'NEEDS_REVISION') && (
                 <form method="post" action={`${base}/requeue`} class="row">
                   <Csrf token={csrf} />
-                  <button class="btn">Return to queue</button>
+                  <button class="btn">Kembali ke antrean</button>
                 </form>
               )}
 
@@ -173,7 +173,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                   {d.prompt && (
                     <div class="prompt-box">
                       <div class="row between">
-                        <strong>Sanitized prompt · {runningRun.template_version}</strong>
+                        <strong>Prompt yang sudah disanitasi · {runningRun.template_version}</strong>
                         <button type="button" class="btn small" data-copy="#prompt-text">
                           Copy prompt
                         </button>
@@ -200,7 +200,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                         <input type="file" name="output_file" accept=".txt,.md,.csv,.pdf,.docx,.png,.jpg,.jpeg,.webp" />
                       </label>
                     ) : (
-                      <p class="muted small">File attachments disabled: R2 binding not configured in this environment.</p>
+                      <p class="muted small">Lampiran file belum aktif: binding R2 belum dikonfigurasi di lingkungan ini.</p>
                     )}
                     <div class="row">
                       <label>
@@ -212,10 +212,10 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                         <input type="number" name="cost_estimate_cents" min={0} />
                       </label>
                     </div>
-                    <button class="btn primary">Attach draft → QC review</button>
+                    <button class="btn primary">Lampirkan draf → tinjauan kualitas</button>
                   </form>
                   <details>
-                    <summary>Provider failed / blocked</summary>
+                    <summary>Provider gagal / terblokir</summary>
                     <form method="post" action={`${base}/production-failure`} class="stack">
                       <Csrf token={csrf} />
                       <input type="hidden" name="run_id" value={runningRun.id} />
@@ -231,8 +231,8 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                         <label>
                           Outcome
                           <select name="outcome">
-                            <option value="BLOCKED_PROVIDER">Blocked (retry later)</option>
-                            <option value="FAILED">Failed (requeue)</option>
+                            <option value="BLOCKED_PROVIDER">Terblokir (coba lagi nanti)</option>
+                            <option value="FAILED">Gagal (masukkan kembali ke antrean)</option>
                           </select>
                         </label>
                         <label>
@@ -244,7 +244,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                         Note (no secrets / private content)
                         <input type="text" name="note" maxlength={1000} />
                       </label>
-                      <button class="btn danger">Record provider failure</button>
+                      <button class="btn danger">Catat kegagalan provider</button>
                     </form>
                   </details>
                 </div>
@@ -279,20 +279,20 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
               {s === 'APPROVED' && (
                 <form method="post" action={`${base}/deliver`} class="row">
                   <Csrf token={csrf} />
-                  <button class="btn primary">Release approved deliverable to customer</button>
+                  <button class="btn primary">Kirim hasil yang disetujui kepada pelanggan</button>
                 </form>
               )}
 
-              {s === 'DELIVERED' && <p>Delivered {fmt(job.delivered_at)}. The customer may request a revision through Public Embrilo.</p>}
-              {s === 'CANCELLED' && <p>Job cancelled.</p>}
+              {s === 'DELIVERED' && <p>Delivered {fmt(job.delivered_at)}. Pelanggan dapat mengajukan revisi melalui Public Embrilo.</p>}
+              {s === 'CANCELLED' && <p>Pekerjaan dibatalkan.</p>}
 
               {op.role === 'ADMIN' && s !== 'CANCELLED' && s !== 'DELIVERED' && (
                 <details class="danger-zone">
-                  <summary>Cancel job (admin)</summary>
+                  <summary>Batalkan pekerjaan (admin)</summary>
                   <form method="post" action={`${base}/cancel`} class="row">
                     <Csrf token={csrf} />
-                    <input type="text" name="reason" minlength={3} maxlength={500} placeholder="Reason" required />
-                    <button class="btn danger">Cancel job</button>
+                    <input type="text" name="reason" minlength={3} maxlength={500} placeholder="Alasan" required />
+                    <button class="btn danger">Batalkan pekerjaan</button>
                   </form>
                 </details>
               )}
@@ -302,15 +302,15 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
           {/* ---------------- Draft preview ---------------- */}
           {d.draftPreview !== null && (
             <section class="card" aria-labelledby="draft-title">
-              <h2 id="draft-title">Latest draft</h2>
+              <h2 id="draft-title">Draf terbaru</h2>
               <pre class="draft">{d.draftPreview}</pre>
             </section>
           )}
 
-          {/* ---------------- Brief workspace ---------------- */}
+          {/* ---------------- Workspace brief ---------------- */}
           <section class="card" aria-labelledby="brief-title">
-            <h2 id="brief-title">Brief workspace</h2>
-            <p class="muted small">Customer-supplied content is untrusted. Reference links are not fetched by the server.</p>
+            <h2 id="brief-title">Workspace brief</h2>
+            <p class="muted small">Konten dari pelanggan diperlakukan sebagai input yang belum tepercaya. Tautan referensi tidak diambil oleh server.</p>
             {w ? (
               <form method="post" action={`${base}/brief`} class="stack">
                 <Csrf token={csrf} />
@@ -333,7 +333,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                   </textarea>
                 </label>
                 <fieldset>
-                  <legend>Platforms</legend>
+                  <legend>Platform</legend>
                   {PLATFORMS.map((p) => (
                     <label class="check inline">
                       <input type="checkbox" name="platforms" value={p} checked={brief.platforms.includes(p)} /> {p}
@@ -373,25 +373,25 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                   </textarea>
                 </label>
                 <label class="check">
-                  <input type="checkbox" name="rights_confirmed" checked={brief.rights_confirmed} /> Customer confirmed rights to supplied material
+                  <input type="checkbox" name="rights_confirmed" checked={brief.rights_confirmed} /> Pelanggan mengonfirmasi hak penggunaan materi yang dikirim
                 </label>
-                <button class="btn">Save brief</button>
+                <button class="btn">Simpan brief</button>
               </form>
             ) : (
               <dl class="brief">
-                <dt>Objective</dt>
+                <dt>Tujuan</dt>
                 <dd>{brief.objective}</dd>
-                <dt>Audience</dt>
+                <dt>Audiens</dt>
                 <dd>{brief.audience}</dd>
-                <dt>Product facts</dt>
+                <dt>Fakta produk</dt>
                 <dd>{brief.product_facts}</dd>
-                <dt>Platforms</dt>
+                <dt>Platform</dt>
                 <dd>{brief.platforms.join(', ')}</dd>
-                <dt>Language / tone / CTA</dt>
+                <dt>Bahasa / gaya / CTA</dt>
                 <dd>
                   {brief.language} / {brief.tone || '—'} / {brief.cta || '—'}
                 </dd>
-                <dt>Constraints</dt>
+                <dt>Batasan</dt>
                 <dd>{brief.constraints || '—'}</dd>
               </dl>
             )}
@@ -401,13 +401,13 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
         <aside class="col-side">
           {w && (
             <section class="card" aria-labelledby="assign-title">
-              <h2 id="assign-title">Assignment</h2>
+              <h2 id="assign-title">Penugasan</h2>
               <form method="post" action={`${base}/assign`} class="stack">
                 <Csrf token={csrf} />
                 <label>
                   Assignee
                   <select name="assignee_id">
-                    <option value="">Unassigned</option>
+                    <option value="">Belum ditugaskan</option>
                     {d.operators.map((o) => (
                       <option value={o.id} selected={o.id === job.assigned_operator_id}>
                         {o.display_name}
@@ -425,15 +425,15 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                     ))}
                   </select>
                 </label>
-                <button class="btn small">Save</button>
+                <button class="btn small">Simpan</button>
               </form>
             </section>
           )}
 
           <section class="card" aria-labelledby="assets-title">
-            <h2 id="assets-title">Private assets</h2>
+            <h2 id="assets-title">Aset privat</h2>
             {d.assets.length === 0 ? (
-              <p class="muted">None yet.</p>
+              <p class="muted">Belum ada data.</p>
             ) : (
               <ul class="plain">
                 {d.assets.map((a) => (
@@ -454,15 +454,15 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                   Add reference file
                   <input type="file" name="reference_file" accept=".txt,.md,.csv,.pdf,.docx,.png,.jpg,.jpeg,.webp" required />
                 </label>
-                <button class="btn small">Upload</button>
+                <button class="btn small">Unggah</button>
               </form>
             )}
           </section>
 
           <section class="card" aria-labelledby="runs-title">
-            <h2 id="runs-title">Production runs</h2>
+            <h2 id="runs-title">Riwayat produksi</h2>
             {d.runs.length === 0 ? (
-              <p class="muted">None yet.</p>
+              <p class="muted">Belum ada data.</p>
             ) : (
               <ul class="plain">
                 {d.runs.map((r) => (
@@ -482,7 +482,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
           </section>
 
           <section class="card" aria-labelledby="reviews-title">
-            <h2 id="reviews-title">Reviews &amp; revisions</h2>
+            <h2 id="reviews-title">Tinjauan &amp; revisi</h2>
             {d.reviews.map((r) => (
               <p class="small">
                 <strong>{r.decision}</strong> by {r.reviewer_name ?? '?'} · {fmt(r.created_at)}
@@ -494,11 +494,11 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                 Round {r.round} · {r.source} · {r.status}: {r.summary}
               </p>
             ))}
-            {d.reviews.length === 0 && d.revisions.length === 0 && <p class="muted">None yet.</p>}
+            {d.reviews.length === 0 && d.revisions.length === 0 && <p class="muted">Belum ada data.</p>}
           </section>
 
           <section class="card" aria-labelledby="history-title">
-            <h2 id="history-title">State history</h2>
+            <h2 id="history-title">Riwayat status</h2>
             <ol class="timeline">
               {d.history.map((h) => (
                 <li>
