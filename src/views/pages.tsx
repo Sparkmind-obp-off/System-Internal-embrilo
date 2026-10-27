@@ -49,7 +49,7 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; counts: Record<string, num
         Open <span class="count">{p.counts.__open ?? 0}</span>
       </a>
       <a href="/console?mine=1" class={p.filter.mine ? 'active' : ''}>
-        Assigned to me
+        Ditugaskan kepada saya
       </a>
       {STATES.map((s) => (
         <a href={`/console?state=${s}`} class={p.filter.state === s ? 'active' : ''}>
@@ -61,7 +61,7 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; counts: Record<string, num
       <p class="empty">Belum ada pekerjaan pada tampilan ini.</p>
     ) : (
       <table class="table">
-        <caption class="sr-only">Jobs</caption>
+        <caption class="sr-only">Daftar pekerjaan</caption>
         <thead>
           <tr>
             <th scope="col">Referensi</th>
@@ -114,7 +114,7 @@ export const MetricsPage: FC<Base & { m: Record<string, number | string | null>;
       <thead>
         <tr>
           <th scope="col">Status</th>
-          <th scope="col">Jobs</th>
+          <th scope="col">Jumlah pekerjaan</th>
         </tr>
       </thead>
       <tbody>
@@ -231,10 +231,10 @@ export const ProvidersPage: FC<Base> = (p) => (
 export const ErrorPage: FC<{ status: number; message: string; op?: OperatorCtx; csrf?: string }> = (p) => (
   <Layout title={`Error ${p.status}`} op={p.op} csrf={p.csrf}>
     <section class="card narrow">
-      <h1>Error {p.status}</h1>
+      <h1>Terjadi kesalahan {p.status}</h1>
       <p>{p.message}</p>
       <p>
-        <a href="/console">Back to queue</a>
+        <a href="/console">Kembali ke antrean</a>
       </p>
     </section>
   </Layout>
