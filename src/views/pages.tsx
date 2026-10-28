@@ -1,19 +1,22 @@
 import type { Child, FC } from 'hono/jsx'
-import { Alert, Chip, Csrf, EmptyState, Field, Flash, Layout, PageHeader, PriorityTag, Section, StateBadge, Time, describe } from './layout'
+import { Alert, Chip, EmptyState, Field, Flash, Layout, PageHeader, PriorityTag, Section, StateBadge, STATE_LABEL_ID, Time } from './layout'
 import { BrandMark, Icon } from './icons'
 import type { JobState } from '../lib/state'
 import type { OperatorCtx } from '../types'
-import { PROVIDERS } from '../lib/providers'
+import { STATES } from '../lib/state'
+import { SERVICE_CODES } from '../lib/validate'
+import { briefIncomplete, type OrderFilter, type SearchResult } from '../services/search'
+import { inboxHref } from '../services/assistant'
 import {
   AUDIT_TYPES,
   QUEUE_VIEWS,
+  PRIORITY_LABEL,
   SERVICE_LABEL,
   ageLabel,
   auditActionLabel,
   fmtDateTime,
   nextAction,
-  relTime,
-  type QueueView
+  relTime
 } from './labels'
 
 type Base = { op: OperatorCtx; csrf: string; ok?: string; err?: string }
@@ -83,46 +86,56 @@ export const LoginPage: FC<{ csrf: string; err?: string; email?: string }> = ({ 
 // ---------------------------------------------------------------------------
 // Queue
 // ---------------------------------------------------------------------------
-export type QueueRow = {
-  id: string
-  public_ref: string
-  service_code: string
-  state: JobState
-  priority: string
-  customer_name: string
-  assignee_name: string | null
-  assigned_operator_id: string | null
-  updated_at: string
-  created_at: string
-  prompt_status: 'READY' | 'DRAFT' | null
-  rights_confirmed: number | null
-}
+const STATE_OPTIONS = STATES
+const SERVICE_OPTIONS = SERVICE_CODES
 
-export type QueueFilter = { view?: QueueView; state?: JobState; mine?: boolean; q?: string; prio?: string }
-
-function queueHref(f: QueueFilter, patch: Partial<QueueFilter>) {
-  const n = { ...f, ...patch }
-  const p = new URLSearchParams()
-  if (n.view) p.set('view', n.view)
-  if (n.state) p.set('state', n.state)
-  if (n.mine) p.set('mine', '1')
-  if (n.q) p.set('q', n.q)
-  if (n.prio) p.set('prio', n.prio)
+/** Builds an Inbox URL from the current filter plus a patch (undefined removes a key). */
+function queueHref(f: OrderFilter, patch: Partial<OrderFilter>) {
+  const n: OrderFilter = { ...f, ...patch }
+  if (!('page' in patch)) delete n.page
+  const href = inboxHref(n)
+  const p = new URLSearchParams(href.split('?')[1] ?? '')
+  if (n.page && n.page > 1) p.set('page', String(n.page))
+  if (n.pageSize && n.pageSize !== 25) p.set('size', String(n.pageSize))
   const s = p.toString()
   return s ? `/console?${s}` : '/console'
 }
 
-export const QueuePage: FC<Base & { rows: QueueRow[]; viewCounts: Record<string, number>; openCount: number; mineCount: number; filter: QueueFilter; now: number }> = (p) => {
-  const f = p.filter
+const ADVANCED_KEYS: (keyof OrderFilter)[] = ['state', 'services', 'prompt', 'revision', 'createdFrom', 'createdTo', 'updatedFrom', 'sort', 'scope', 'needsMe']
+
+export const QueuePage: FC<Base & { result: SearchResult; viewCounts: Record<string, number>; openCount: number; mineCount: number; now: number }> = (p) => {
+  const { rows, total, page, pages, pageSize } = p.result
+  const f = p.result.filter
   const activeView = QUEUE_VIEWS.find((v) => v.id === f.view)
-  const title = activeView ? activeView.label : f.state ? `Status: ${f.state}` : f.mine ? 'Ditugaskan ke saya' : 'Perlu perhatian'
-  const filtered = !!(f.q || f.prio)
+  const title = activeView
+    ? activeView.label
+    : f.state
+      ? `Status: ${STATE_LABEL_ID[f.state]}`
+      : f.needsMe
+        ? 'Perlu tindakan saya'
+        : f.mine
+          ? 'Ditugaskan ke saya'
+          : f.scope === 'all'
+            ? 'Semua order'
+            : 'Semua terbuka'
+  const filtered = !!(f.q || f.prio || ADVANCED_KEYS.some((k) => f[k] !== undefined))
+  const advancedOpen = ADVANCED_KEYS.some((k) => f[k] !== undefined)
+  const first = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const last = Math.min(total, page * pageSize)
+  const tab = (active: boolean) => `tab${active ? ' is-active' : ''}`
+  const plain = !f.view && !f.state && !f.mine && !f.needsMe && f.scope !== 'all'
   return (
-    <Layout title="Antrean" op={p.op} csrf={p.csrf} active="queue">
+    <Layout title="Inbox" op={p.op} csrf={p.csrf} active="queue">
       <PageHeader
         eyebrow="Inbox pesanan"
         title="Apa yang perlu dikerjakan sekarang"
-        description="Pesanan dari Embrilo Public masuk ke sini. Buka pesanan untuk memahami brief, lalu siapkan prompt di Prompt Studio dan jalankan secara manual."
+        description="Cari dan saring order nyata dari database. Buka order untuk memahami brief, siapkan prompt di Prompt Studio, lalu jalankan secara manual."
+        actions={
+          <a class="btn btn-secondary btn-sm" href="/console/assistant">
+            <Icon name="message" size={16} />
+            Tanya asisten
+          </a>
+        }
       />
       <Flash ok={p.ok} err={p.err} />
 
@@ -139,26 +152,40 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; viewCounts: Record<string,
       <section class="card queue-card" aria-labelledby="queue-title" data-animate="enter">
         <div class="queue-toolbar">
           <div class="tabs" role="list" aria-label="Tampilan">
-            <a role="listitem" class={`tab${!f.view && !f.state && !f.mine ? ' is-active' : ''}`} href={queueHref({ q: f.q, prio: f.prio }, {})}>
+            <a role="listitem" class={tab(plain)} href={queueHref({ q: f.q, prio: f.prio }, {})}>
               Semua terbuka <span class="tab-count">{p.openCount}</span>
             </a>
-            <a role="listitem" class={`tab${f.mine ? ' is-active' : ''}`} href={queueHref({ q: f.q, prio: f.prio }, { mine: true })}>
+            <a role="listitem" class={tab(!!f.needsMe && !f.view)} href={queueHref({ q: f.q, prio: f.prio }, { needsMe: true })}>
+              Perlu tindakan saya
+            </a>
+            <a role="listitem" class={tab(!!f.mine && !f.needsMe)} href={queueHref({ q: f.q, prio: f.prio }, { mine: true })}>
               Milik saya <span class="tab-count">{p.mineCount}</span>
             </a>
-            <a role="listitem" class={`tab${f.view === 'done' ? ' is-active' : ''}`} href={queueHref({ q: f.q, prio: f.prio }, { view: 'done' })}>
+            <a role="listitem" class={tab(f.view === 'done')} href={queueHref({ q: f.q, prio: f.prio }, { view: 'done' })}>
               Selesai <span class="tab-count">{p.viewCounts.done ?? 0}</span>
             </a>
           </div>
-          <form method="get" action="/console" class="queue-search" role="search">
-            {f.view && <input type="hidden" name="view" value={f.view} />}
-            {f.state && <input type="hidden" name="state" value={f.state} />}
-            {f.mine && <input type="hidden" name="mine" value="1" />}
+        </div>
+
+        <form method="get" action="/console" class="queue-filters" role="search" id="order-search">
+          {f.view && <input type="hidden" name="view" value={f.view} />}
+          {f.mine && <input type="hidden" name="mine" value="1" />}
+          <div class="queue-search">
             <label class="sr-only" for="queue-q">
-              Cari referensi atau pelanggan
+              Cari order
             </label>
             <span class="search-wrap">
               <Icon name="search" size={16} />
-              <input id="queue-q" type="search" name="q" value={f.q ?? ''} maxlength={64} placeholder="Cari referensi / pelanggan" />
+              <input
+                id="queue-q"
+                type="search"
+                name="q"
+                value={f.q ?? ''}
+                maxlength={64}
+                placeholder={p.op.role === 'VIEWER' ? 'Cari referensi, pelanggan, atau kata kunci brief' : 'Cari referensi, pelanggan, ref pelanggan, atau kata kunci brief'}
+                data-shortcut="/"
+                aria-keyshortcuts="/"
+              />
             </span>
             <label class="sr-only" for="queue-prio">
               Prioritas
@@ -167,33 +194,159 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; viewCounts: Record<string,
               <option value="">Semua prioritas</option>
               {(['URGENT', 'HIGH', 'NORMAL', 'LOW'] as const).map((x) => (
                 <option value={x} selected={f.prio === x}>
-                  {{ URGENT: 'Mendesak', HIGH: 'Tinggi', NORMAL: 'Normal', LOW: 'Rendah' }[x]}
+                  {PRIORITY_LABEL[x]}
                 </option>
               ))}
             </select>
-            <button type="submit" class="btn btn-secondary btn-sm">
+            <button type="submit" class="btn btn-primary btn-sm">
               <Icon name="filter" size={16} />
               Terapkan
             </button>
-          </form>
-        </div>
+          </div>
+          <details class="filter-more" open={advancedOpen}>
+            <summary>Filter lanjutan</summary>
+            <div class="filter-grid">
+              <div class="field">
+                <label class="field-label" for="flt-state">
+                  Status
+                </label>
+                <select id="flt-state" name="state" disabled={!!f.view}>
+                  <option value="">{f.view ? 'Mengikuti tampilan' : 'Semua status terbuka'}</option>
+                  {STATE_OPTIONS.map((s2) => (
+                    <option value={s2} selected={f.state === s2}>
+                      {STATE_LABEL_ID[s2]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label" for="flt-service">
+                  Layanan
+                </label>
+                <select id="flt-service" name="service">
+                  <option value="">Semua layanan</option>
+                  {SERVICE_OPTIONS.map((sv) => (
+                    <option value={sv} selected={f.services?.length === 1 && f.services[0] === sv}>
+                      {SERVICE_LABEL[sv] ?? sv}
+                    </option>
+                  ))}
+                  {f.services && f.services.length > 1 && (
+                    <option value={f.services.join(',')} selected>
+                      {f.services.map((x) => SERVICE_LABEL[x] ?? x).join(' / ')}
+                    </option>
+                  )}
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label" for="flt-prompt">
+                  Prompt
+                </label>
+                <select id="flt-prompt" name="prompt">
+                  <option value="">Semua</option>
+                  <option value="none" selected={f.prompt === 'none'}>
+                    Belum ada prompt
+                  </option>
+                  <option value="draft" selected={f.prompt === 'draft'}>
+                    Draf, belum siap
+                  </option>
+                  <option value="ready" selected={f.prompt === 'ready'}>
+                    Siap dieksekusi
+                  </option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label" for="flt-revision">
+                  Revisi
+                </label>
+                <select id="flt-revision" name="revision">
+                  <option value="">Semua</option>
+                  <option value="open" selected={f.revision === 'open'}>
+                    Ada revisi terbuka
+                  </option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label" for="flt-cfrom">
+                  Masuk sejak
+                </label>
+                <input id="flt-cfrom" type="date" name="created_from" value={f.createdFrom ?? ''} />
+              </div>
+              <div class="field">
+                <label class="field-label" for="flt-cto">
+                  Masuk sampai
+                </label>
+                <input id="flt-cto" type="date" name="created_to" value={f.createdTo ?? ''} />
+              </div>
+              <div class="field">
+                <label class="field-label" for="flt-ufrom">
+                  Diperbarui sejak
+                </label>
+                <input id="flt-ufrom" type="date" name="updated_from" value={f.updatedFrom ?? ''} />
+              </div>
+              <div class="field">
+                <label class="field-label" for="flt-sort">
+                  Urutkan
+                </label>
+                <select id="flt-sort" name="sort">
+                  <option value="">Prioritas, lalu terlama</option>
+                  <option value="updated" selected={f.sort === 'updated'}>
+                    Terakhir diperbarui
+                  </option>
+                  <option value="created" selected={f.sort === 'created'}>
+                    Terbaru masuk
+                  </option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label" for="flt-scope">
+                  Cakupan
+                </label>
+                <select id="flt-scope" name="scope" disabled={!!f.view || !!f.state}>
+                  <option value="">Hanya yang belum selesai</option>
+                  <option value="all" selected={f.scope === 'all'}>
+                    Termasuk terkirim & dibatalkan
+                  </option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label" for="flt-size">
+                  Per halaman
+                </label>
+                <select id="flt-size" name="size">
+                  {[10, 25, 50].map((n) => (
+                    <option value={String(n)} selected={pageSize === n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <label class="check filter-check">
+                <input type="checkbox" name="needs_me" value="1" checked={!!f.needsMe} />
+                <span>Hanya yang perlu tindakan tim (milik saya / belum ditugaskan)</span>
+              </label>
+            </div>
+          </details>
+        </form>
 
         <div class="queue-head">
           <h2 class="card-title" id="queue-title">
-            {title} <span class="muted">· {p.rows.length} pekerjaan</span>
+            {title}{' '}
+            <span class="muted" aria-live="polite">
+              · {total === 0 ? 'tidak ada order' : `${first}–${last} dari ${total} order`}
+            </span>
           </h2>
           {filtered && (
-            <a class="btn btn-ghost btn-sm" href={queueHref({ view: f.view, state: f.state, mine: f.mine }, {})}>
+            <a class="btn btn-ghost btn-sm" href={queueHref({ view: f.view, mine: f.mine }, {})}>
               <Icon name="x" size={14} />
               Hapus filter
             </a>
           )}
         </div>
 
-        {p.rows.length === 0 ? (
+        {rows.length === 0 ? (
           <EmptyState icon={filtered ? 'search' : 'check'} title={filtered ? 'Tidak ada yang cocok' : 'Tidak ada pekerjaan di sini'}>
             {filtered
-              ? 'Coba kata kunci lain atau hapus filter prioritas.'
+              ? 'Tidak ada order di database yang cocok dengan pencarian atau filter ini. Coba kata kunci lain atau hapus filter.'
               : f.view === 'done'
                 ? 'Pekerjaan yang terkirim atau dibatalkan akan muncul di sini.'
                 : 'Bagian ini kosong. Permintaan baru dari Public Embrilo akan masuk otomatis.'}
@@ -201,26 +354,29 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; viewCounts: Record<string,
         ) : (
           <div class="table-wrap">
             <table class="table queue-table">
-              <caption class="sr-only">Daftar pekerjaan: {title}</caption>
+              <caption class="sr-only">Daftar order: {title}</caption>
               <thead>
                 <tr>
                   <th scope="col">Referensi</th>
                   <th scope="col">Status</th>
                   <th scope="col">Langkah berikutnya</th>
-                  <th scope="col">Prompt</th>
+                  <th scope="col">Indikator</th>
                   <th scope="col">Prioritas</th>
                   <th scope="col">Pemilik</th>
-                  <th scope="col">Umur</th>
+                  <th scope="col">Pembaruan</th>
                 </tr>
               </thead>
               <tbody>
-                {p.rows.map((r) => {
+                {rows.map((r) => {
                   const age = ageLabel(r.created_at, p.now)
                   const na = nextAction(r.state)
+                  const closed = ['DELIVERED', 'CANCELLED', 'APPROVED', 'QC_REVIEW', 'IN_PRODUCTION'].includes(r.state)
                   return (
                     <tr data-animate="row" class={`prio-row-${r.priority.toLowerCase()}`}>
                       <td data-label="Referensi" class="cell-ref">
-                        <a class="ref-link" href={`/console/jobs/${r.id}`}>{r.public_ref}</a>
+                        <a class="ref-link" href={`/console/jobs/${r.id}`}>
+                          {r.public_ref}
+                        </a>
                         <span class="cell-sub">
                           {r.customer_name} · {SERVICE_LABEL[r.service_code] ?? r.service_code}
                         </span>
@@ -235,36 +391,37 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; viewCounts: Record<string,
                           {na.label}
                         </span>
                       </td>
-                      <td data-label="Prompt">
-                        {r.prompt_status === 'READY' ? (
-                          <Chip tone="success">Siap</Chip>
-                        ) : r.prompt_status === 'DRAFT' ? (
-                          <Chip tone="neutral">Draf</Chip>
-                        ) : ['DELIVERED', 'CANCELLED', 'APPROVED', 'QC_REVIEW', 'IN_PRODUCTION'].includes(r.state) ? (
-                          <span class="muted small">—</span>
-                        ) : (
-                          <a class="small" href={`/console/jobs/${r.id}/studio`}>Siapkan</a>
-                        )}
-                        {r.rights_confirmed === 0 && <span class="cell-sub warn-text">Info kurang: hak materi</span>}
+                      <td data-label="Indikator">
+                        <span class="chip-list">
+                          {r.prompt_status === 'READY' ? (
+                            <Chip tone="success">Prompt siap</Chip>
+                          ) : r.prompt_status === 'DRAFT' ? (
+                            <Chip tone="neutral">Prompt draf</Chip>
+                          ) : closed ? null : (
+                            <a class="chip chip-link" href={`/console/jobs/${r.id}/studio`}>
+                              Siapkan prompt
+                            </a>
+                          )}
+                          {briefIncomplete(r) && <Chip tone="warning">Brief kurang</Chip>}
+                          {r.state === 'NEEDS_INFO' && <Chip tone="warning">Menunggu klarifikasi</Chip>}
+                          {(r.state === 'NEEDS_REVISION' || r.open_revisions > 0) && <Chip tone="review">Revisi{r.open_revisions ? ` · ${r.open_revisions}` : ''}</Chip>}
+                          {r.state === 'DELIVERED' && <Chip tone="success">Terkirim</Chip>}
+                        </span>
                       </td>
                       <td data-label="Prioritas">
                         <PriorityTag priority={r.priority} />
                       </td>
                       <td data-label="Pemilik">
                         {r.assignee_name ? (
-                          <span class={r.assigned_operator_id === p.op.id ? 'owner owner-me' : 'owner'}>
-                            {r.assigned_operator_id === p.op.id ? 'Saya' : r.assignee_name}
-                          </span>
+                          <span class={r.assigned_operator_id === p.op.id ? 'owner owner-me' : 'owner'}>{r.assigned_operator_id === p.op.id ? 'Saya' : r.assignee_name}</span>
                         ) : (
                           <span class="muted">Belum ditugaskan</span>
                         )}
                       </td>
-                      <td data-label="Umur">
-                        <span class={age.stale && r.state !== 'DELIVERED' && r.state !== 'CANCELLED' ? 'age age-stale' : 'age'} title={`Masuk ${fmtDateTime(r.created_at)}`}>
-                          {age.text}
-                        </span>
-                        <span class="cell-sub">
-                          diperbarui <Time iso={r.updated_at}>{relTime(r.updated_at, p.now)}</Time>
+                      <td data-label="Pembaruan">
+                        <Time iso={r.updated_at}>{relTime(r.updated_at, p.now)}</Time>
+                        <span class={age.stale && r.state !== 'DELIVERED' && r.state !== 'CANCELLED' ? 'cell-sub age-stale' : 'cell-sub'} title={`Masuk ${fmtDateTime(r.created_at)}`}>
+                          umur {age.text}
                         </span>
                       </td>
                     </tr>
@@ -273,6 +430,36 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; viewCounts: Record<string,
               </tbody>
             </table>
           </div>
+        )}
+
+        {pages > 1 && (
+          <nav class="pager" aria-label="Halaman hasil">
+            {page > 1 ? (
+              <a class="btn btn-secondary btn-sm" href={queueHref(f, { page: page - 1 })} rel="prev">
+                <Icon name="arrowLeft" size={14} />
+                Sebelumnya
+              </a>
+            ) : (
+              <span class="btn btn-secondary btn-sm is-disabled" aria-disabled="true">
+                <Icon name="arrowLeft" size={14} />
+                Sebelumnya
+              </span>
+            )}
+            <span class="pager-info">
+              Halaman {page} dari {pages}
+            </span>
+            {page < pages ? (
+              <a class="btn btn-secondary btn-sm" href={queueHref(f, { page: page + 1 })} rel="next">
+                Berikutnya
+                <Icon name="arrowRight" size={14} />
+              </a>
+            ) : (
+              <span class="btn btn-secondary btn-sm is-disabled" aria-disabled="true">
+                Berikutnya
+                <Icon name="arrowRight" size={14} />
+              </span>
+            )}
+          </nav>
         )}
       </section>
     </Layout>
@@ -455,96 +642,6 @@ export const AuditPage: FC<Base & { rows: AuditRow[]; filter: { type?: string; q
 )
 
 // ---------------------------------------------------------------------------
-// Production AI (provider) page
-// ---------------------------------------------------------------------------
-export const ProvidersPage: FC<Base> = (p) => (
-  <Layout title="Produksi AI" op={p.op} csrf={p.csrf} active="providers">
-    <PageHeader
-      eyebrow="Integrasi produksi"
-      title="Produksi AI: manual-assisted"
-      description="Bagaimana draf dibuat, dan apa yang benar-benar terintegrasi saat ini."
-    />
-    <Alert tone="warning" title="Belum ada otomatisasi Genspark yang terverifikasi" icon="info">
-      Aplikasi ini tidak memanggil Genspark secara otomatis. Tidak ada API, connector, atau MCP Genspark yang sudah diuji dari Worker ini. Setiap produksi adalah
-      serah-terima manual oleh operator, dan dicatat lengkap (operator, versi template, digest prompt).
-    </Alert>
-    <Section id="handoff" title="Alur serah-terima" icon="clipboard" description="Dilakukan dari halaman detail pekerjaan saat status “Siap diproduksi”.">
-      <ol class="steps">
-        <li>
-          <span class="step-n">1</span>
-          <div>
-            <p class="step-title">Mulai produksi</p>
-            <p class="muted">Konsol membuat prompt tersanitasi dari brief: email, nomor telepon, dan string mirip kunci rahasia disamarkan otomatis.</p>
-          </div>
-        </li>
-        <li>
-          <span class="step-n">2</span>
-          <div>
-            <p class="step-title">Periksa & salin prompt</p>
-            <p class="muted">Pastikan tidak ada data pribadi atau data pelanggan lain, lalu salin dengan satu klik.</p>
-          </div>
-        </li>
-        <li>
-          <span class="step-n">3</span>
-          <div>
-            <p class="step-title">Jalankan di Genspark</p>
-            <p class="muted">Tempel di workspace Genspark Anda sendiri. Tinjau hasilnya — jangan percaya klaim yang tidak ada di brief.</p>
-          </div>
-        </li>
-        <li>
-          <span class="step-n">4</span>
-          <div>
-            <p class="step-title">Lampirkan hasil</p>
-            <p class="muted">Tempel teks atau unggah file. Pekerjaan pindah ke tinjauan QC. Jika provider gagal, catat kegagalannya — pekerjaan tetap bisa dipulihkan.</p>
-          </div>
-        </li>
-      </ol>
-    </Section>
-    <Section id="adapters" title="Adapter yang tersedia" icon="plug">
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th scope="col">Adapter</th>
-              <th scope="col">Mode</th>
-              <th scope="col">Otomatis & terverifikasi</th>
-              <th scope="col">Cara kerja</th>
-            </tr>
-          </thead>
-          <tbody>
-            {PROVIDERS.map((pr) => (
-              <tr>
-                <td data-label="Adapter">
-                  <strong>{pr.id === 'genspark-manual' ? 'Genspark (manual-assisted)' : 'Penulis manusia (tanpa AI)'}</strong>
-                  <span class="cell-sub">
-                    <code class="code-soft">{pr.id}</code>
-                  </span>
-                </td>
-                <td data-label="Mode">
-                  <Chip tone="neutral">{pr.mode === 'manual' ? 'Manual' : pr.mode}</Chip>
-                </td>
-                <td data-label="Terverifikasi">{pr.verified ? <Chip tone="success">Ya</Chip> : <Chip tone="muted">Tidak — manual</Chip>}</td>
-                <td data-label="Cara kerja" class="cell-wrap">
-                  {pr.id === 'genspark-manual'
-                    ? 'Operator menyalin prompt tersanitasi ke workspace Genspark-nya, meninjau hasil, lalu menempel/mengunggahnya di sini. Tidak ada panggilan otomatis.'
-                    : 'Operator menulis hasil langsung berdasarkan brief.'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p class="muted small">
-        Untuk menambah adapter otomatis: verifikasi integrasi resmi yang terdokumentasi, simpan kredensialnya sebagai secret Worker, implementasikan <code>execute()</code> di{' '}
-        <code>src/lib/providers.ts</code>, lalu catat bukti uji end-to-end di <code>docs/08-implementation-status.md</code>.
-      </p>
-    </Section>
-  </Layout>
-)
-
-// ---------------------------------------------------------------------------
-// Errors
-// ---------------------------------------------------------------------------
 const ERROR_COPY: Record<number, { title: string; body: string }> = {
   400: { title: 'Permintaan tidak valid', body: 'Data yang dikirim tidak bisa diproses. Kembali dan coba lagi.' },
   403: { title: 'Akses ditolak', body: 'Peran Anda tidak mengizinkan tindakan ini, atau token keamanan kedaluwarsa. Muat ulang halaman lalu coba lagi.' },
@@ -589,4 +686,3 @@ export const ErrorPage: FC<{ status: number; message?: string; reference?: strin
   )
 }
 
-export { Csrf, describe }

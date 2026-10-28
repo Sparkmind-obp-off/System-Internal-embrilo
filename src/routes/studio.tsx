@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import { requireOperator, requireRole, verifyCsrf } from '../lib/auth'
 import { AppError } from '../lib/errors'
 import { readInput } from '../lib/http'
+import { audit } from '../lib/audit'
 import { WORK_TYPES } from '../lib/templates'
 import { GROQ_MODELS, WORKERS_AI_MODELS, usageToday } from '../lib/llm'
 import * as studio from '../services/studio'
@@ -57,6 +58,31 @@ async function renderStudio(c: Context<AppEnv>, jobId: string, extra: { ok?: str
 studioApp.get('/console/jobs/:id/studio', (c) => {
   requireRole(c.get('operator'), 'ADMIN', 'OPERATOR', 'VIEWER')
   return renderStudio(c, c.req.param('id'))
+})
+
+/**
+ * Export one prompt version as a Markdown file. Read-only and audited; exporting is NOT execution.
+ * Defaults to the READY version, else the latest.
+ */
+studioApp.get('/console/jobs/:id/studio/export', async (c) => {
+  const op = requireRole(c.get('operator'), 'ADMIN', 'OPERATOR', 'VIEWER')
+  const st = await studio.loadStudio(c.env, c.req.param('id'))
+  const vParam = Number(c.req.query('v'))
+  const v = Number.isInteger(vParam) ? st.versions.find((x) => x.version === vParam) : (st.ready ?? st.latest)
+  if (!v) throw new AppError(404, 'not_found', 'Belum ada versi prompt')
+  await audit(c.env.DB, { type: 'OPERATOR', id: op.id }, 'studio.exported', 'job', st.job.id, c.get('cid'), { version: v.version, status: v.status })
+  const header = [
+    `<!-- Embrilo OS · ${st.order.public_ref} · prompt v${v.version} (${v.status}) · ${v.template_id} · diekspor ${new Date().toISOString()} -->`,
+    '<!-- Ekspor bukan eksekusi: jalankan manual, lalu catat hasilnya di halaman order. -->',
+    ''
+  ].join('\n')
+  return new Response(header + v.body + '\n', {
+    headers: {
+      'content-type': 'text/markdown; charset=utf-8',
+      'content-disposition': `attachment; filename="${st.order.public_ref}-prompt-v${v.version}.md"`,
+      'cache-control': 'no-store'
+    }
+  })
 })
 
 type StudioAction = (c: Context<AppEnv>, op: OperatorCtx, id: string, input: Record<string, unknown>, cid: string) => Promise<unknown>

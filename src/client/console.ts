@@ -202,8 +202,45 @@ function cleanFlashParams() {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// Assistant & search helpers (progressive enhancement only).
+// ---------------------------------------------------------------------------
+function setupAssistant() {
+  // Enter sends, Shift+Enter adds a new line.
+  document.querySelectorAll<HTMLTextAreaElement>('textarea[data-submit-on-enter]').forEach((ta) => {
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault()
+        if (ta.value.trim()) ta.form?.requestSubmit()
+      }
+    })
+  })
+  // Keep the newest answer in view inside the scrollable thread and move focus to it after a reply.
+  document.querySelectorAll<HTMLElement>('.thread').forEach((t) => (t.scrollTop = t.scrollHeight))
+  if (location.hash === '#assistant-latest') {
+    const latest = document.getElementById('assistant-latest')
+    if (latest) {
+      latest.scrollIntoView({ block: 'nearest', behavior: reduceMotion.matches ? 'auto' : 'smooth' })
+      latest.focus({ preventScroll: true })
+    }
+  }
+  // "/" focuses the search box (unless typing in a field).
+  const search = document.querySelector<HTMLInputElement>('[data-shortcut="/"]')
+  if (search)
+    document.addEventListener('keydown', (e) => {
+      const el = e.target as HTMLElement
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return
+      if (el.closest('input, textarea, select, [contenteditable="true"]')) return
+      e.preventDefault()
+      search.focus()
+      search.select()
+    })
+}
+
 function init() {
   setupCopy()
+  setupAssistant()
   setupPasswordToggle()
   setupSubmitState()
   focusFirstError()

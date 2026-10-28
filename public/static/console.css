@@ -607,6 +607,69 @@ fieldset:disabled .check-row { cursor: default; opacity: 0.8; }
   .title-sub { white-space: normal; }
 }
 
+
+/* ---------- Inbox filters & pagination ---------- */
+.queue-filters { display: flex; flex-direction: column; gap: var(--sp-2); padding: 0 var(--sp-5) var(--sp-3); }
+.filter-more > summary { cursor: pointer; font-size: var(--fs-sm); font-weight: 650; color: var(--ink-700); min-height: 32px; display: inline-flex; align-items: center; gap: var(--sp-1); }
+.filter-more > summary:focus-visible { outline: 2px solid var(--forest-500); outline-offset: 2px; border-radius: var(--r-sm); }
+.filter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-3); padding: var(--sp-3); margin-top: var(--sp-2); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-sunken); }
+.filter-grid select, .filter-grid input[type="date"] { min-height: 34px; font-size: var(--fs-sm); }
+.filter-grid input[type="date"] { width: 100%; padding: 0 var(--sp-2); border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--surface); color: var(--text); font: inherit; font-size: var(--fs-sm); }
+.filter-check { grid-column: 1 / -1; display: flex; gap: var(--sp-2); align-items: center; font-size: var(--fs-sm); }
+.check { display: inline-flex; gap: var(--sp-2); align-items: flex-start; cursor: pointer; }
+.check input { margin-top: 3px; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3) var(--sp-5) var(--sp-4); border-top: 1px solid var(--line); }
+.pager-info { font-size: var(--fs-sm); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.btn.is-disabled { opacity: 0.45; pointer-events: none; }
+.chip-link { text-decoration: none; border: 1px dashed var(--line-strong); background: var(--surface); color: var(--forest-700); }
+.chip-link:hover { border-color: var(--forest-500); background: var(--forest-50); }
+
+/* ---------- Assistant ---------- */
+.assistant-body { display: flex; flex-direction: column; gap: var(--sp-4); }
+.thread { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-3); max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
+.assistant-compact .thread { max-height: 520px; }
+.thread-more { font-size: var(--fs-sm); text-align: center; }
+.msg { padding: var(--sp-3) var(--sp-4); border-radius: var(--r-lg); border: 1px solid var(--line); display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.msg-op { background: var(--forest-50); border-color: var(--forest-100); align-self: flex-end; max-width: 88%; }
+.msg-ai { background: var(--surface); }
+.msg-ai:focus { outline: 2px solid var(--forest-500); outline-offset: 2px; }
+.msg-meta { font-size: var(--fs-xs); color: var(--text-2); }
+.msg-text { font-size: var(--fs-md); overflow-wrap: anywhere; }
+.msg-text.pre, .pre { white-space: pre-wrap; }
+.msg-block { display: flex; flex-direction: column; gap: var(--sp-2); }
+.msg-block textarea { font-size: var(--fs-sm); background: var(--surface-sunken); }
+.msg-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-700); }
+.fact-list { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.fact-list-rich { list-style: none; padding: 0; }
+.fact-list-rich li { display: flex; flex-direction: column; padding: var(--sp-2) 0; border-top: 1px solid var(--line); }
+.fact-list-rich li:first-child { border-top: 0; }
+.result-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.result-list li { display: flex; flex-wrap: wrap; gap: 4px var(--sp-2); align-items: center; padding: var(--sp-2) 0; border-top: 1px solid var(--line); }
+.result-list li:first-child { border-top: 0; }
+.result-list .cell-sub { flex-basis: 100%; }
+.suggestion { padding: var(--sp-3); border-radius: var(--r-md); background: var(--review-bg); border: 1px solid var(--review-line); }
+.suggestion .msg-label { color: var(--review-fg); }
+.action-card { padding: var(--sp-3); border-radius: var(--r-md); border: 1px solid var(--line-strong); background: var(--surface-sunken); display: flex; flex-direction: column; gap: var(--sp-2); }
+.action-proposed { border-color: var(--forest-500); box-shadow: 0 0 0 1px var(--forest-100); }
+.action-failed { border-color: var(--danger-line); background: var(--danger-bg); }
+.sources { font-size: var(--fs-xs); color: var(--text-2); }
+.sources summary { cursor: pointer; font-weight: 600; min-height: 28px; display: inline-flex; align-items: center; }
+.sources ul { margin: var(--sp-1) 0 0; padding-left: 1.1rem; }
+.ask-form { display: flex; flex-direction: column; gap: var(--sp-2); border-top: 1px solid var(--line); padding-top: var(--sp-3); }
+.ask-row { display: flex; gap: var(--sp-2); align-items: flex-end; }
+.ask-row textarea { flex: 1; min-height: 44px; }
+.ask-ai { font-size: var(--fs-xs); color: var(--text-2); }
+.ask-examples { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
+.chip-button { cursor: pointer; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-700); font: inherit; font-size: var(--fs-xs); min-height: 30px; }
+.chip-button:hover { border-color: var(--forest-500); color: var(--forest-700); background: var(--forest-50); }
+.chip-button:focus-visible { outline: 2px solid var(--forest-500); outline-offset: 2px; }
+@media (max-width: 720px) {
+  .queue-filters { padding: 0 var(--sp-4) var(--sp-3); }
+  .pager { padding: var(--sp-3) var(--sp-4); }
+  .ask-row { flex-direction: column; align-items: stretch; }
+  .msg-op { max-width: 100%; }
+}
+
 /* ---------- Motion bootstrap ----------
    html.motion is set by /static/boot.js before first paint (never when reduced motion is requested).
    Entrance elements start hidden; the script reveals them. A delayed CSS fallback guarantees they
@@ -623,7 +686,7 @@ html.motion [data-animate].is-shown { animation: none; }
 }
 
 @media print {
-  .sidebar, .toast-region, .action-panel, .skip-link, .app-foot { display: none !important; }
+  .sidebar, .toast-region, .action-panel, .skip-link, .app-foot, .assistant, .queue-filters, .pager { display: none !important; }
   .shell { display: block; }
   body { background: #fff; }
   .card { box-shadow: none; }

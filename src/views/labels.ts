@@ -239,7 +239,14 @@ export function auditActionLabel(action: string): string {
     'delivery.released': 'Dikirim ke pelanggan',
     'revision.requested': 'Revisi diminta pelanggan',
     'asset.reference_added': 'Referensi diunggah',
-    'asset.downloaded': 'Aset privat diunduh'
+    'asset.downloaded': 'Aset privat diunduh',
+    'studio.exported': 'Prompt diekspor',
+    'assistant.asked': 'Pertanyaan ke asisten',
+    'assistant.action_proposed': 'Asisten mengusulkan tindakan',
+    'assistant.action_confirmed': 'Tindakan asisten dikonfirmasi',
+    'assistant.action_cancelled': 'Tindakan asisten dibatalkan',
+    'assistant.action_failed': 'Tindakan asisten gagal',
+    'assistant.cleared': 'Percakapan asisten dihapus'
   }
   if (fixed[action]) return fixed[action]
   const m = action.match(/^job\.transition\.(.+)$/)
@@ -255,5 +262,7 @@ export const AUDIT_TYPES: { id: string; label: string; prefix: string }[] = [
   { id: 'review', label: 'Tinjauan QC', prefix: 'review.' },
   { id: 'delivery', label: 'Pengiriman', prefix: 'delivery.' },
   { id: 'revision', label: 'Revisi', prefix: 'revision.' },
-  { id: 'asset', label: 'Aset', prefix: 'asset.' }
+  { id: 'asset', label: 'Aset', prefix: 'asset.' },
+  { id: 'studio', label: 'Prompt Studio', prefix: 'studio.' },
+  { id: 'assistant', label: 'Asisten', prefix: 'assistant.' }
 ]

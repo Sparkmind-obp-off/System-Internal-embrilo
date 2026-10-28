@@ -313,10 +313,10 @@ describe('file uploads (private R2)', () => {
 })
 
 describe('console pages & headers', () => {
-  it('renders queue, job detail, metrics and providers with strict security headers', async () => {
+  it('renders queue, job detail, metrics, settings and assistant with strict security headers', async () => {
     const { jobId } = await submit(env, 'cust_pages_0001')
     await driveTo(env, op, jobId, 'IN_PRODUCTION')
-    for (const p of ['/console', `/console/jobs/${jobId}`, '/console/metrics', '/console/providers']) {
+    for (const p of ['/console', `/console/jobs/${jobId}`, '/console/metrics', '/console/settings', '/console/assistant']) {
       const res = await call(env, p, { headers: { cookie: op.cookie } })
       expect(res.status, p).toBe(200)
       expect(res.headers.get('content-security-policy')).toContain("frame-ancestors 'none'")
@@ -383,7 +383,7 @@ describe('console pages & headers', () => {
 
   it('pages ship no inline scripts or inline styles (strict CSP compatible)', async () => {
     const { jobId } = await submit(env, 'cust_csp_000001')
-    for (const p of ['/login', '/console', `/console/jobs/${jobId}`, '/console/metrics', '/console/providers']) {
+    for (const p of ['/login', '/console', `/console/jobs/${jobId}`, '/console/metrics', '/console/settings', '/console/assistant', `/console/assistant?job=${jobId}`, `/console/jobs/${jobId}/studio`]) {
       const html = await (await call(env, p, { headers: { cookie: op.cookie } })).text()
       expect(html, p).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/)
       expect(html, p).not.toMatch(/\sstyle="/)

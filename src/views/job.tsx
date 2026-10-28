@@ -1,10 +1,13 @@
 import type { Child, FC } from 'hono/jsx'
-import { Alert, Chip, Csrf, EmptyState, Field, Flash, Layout, PriorityTag, Section, StateBadge, STATE_LABEL_ID, Time, describe } from './layout'
+import { Alert, Chip, Csrf, Field, Flash, Layout, PriorityTag, Section, StateBadge, STATE_LABEL_ID, Time, describe } from './layout'
 import { Icon } from './icons'
 import { customerStatus, type JobState } from '../lib/state'
 import { PLATFORMS, LANGUAGES, PRIORITIES } from '../lib/validate'
 import { PROVIDERS, PROVIDER_ERROR_CODES } from '../lib/providers'
 import { QC_CHECKLIST, BRIEF_EDITABLE } from '../services/jobs'
+import { AssistantPanel } from './assistant'
+import type { ThreadMessage } from '../services/assistant'
+import type { ProviderStatus } from '../services/studio'
 import type { OperatorCtx } from '../types'
 import {
   LANGUAGE_LABEL,
@@ -23,6 +26,7 @@ import {
 } from './labels'
 
 export type JobDetail = {
+  assistant?: { thread: ThreadMessage[]; provider: ProviderStatus }
   job: {
     id: string
     state: JobState
@@ -607,6 +611,9 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
         </div>
 
         <aside class="job-side" aria-label="Informasi pendukung">
+          {d.assistant && (
+            <AssistantPanel op={op} csrf={csrf} context={{ jobId: job.id, ref: order.public_ref }} thread={d.assistant.thread} provider={d.assistant.provider} back={base} now={now} compact />
+          )}
           {w && (
             <Section id="assign" title="Penugasan" icon="user">
               <form method="post" action={`${base}/assign`} class="stack">
@@ -931,4 +938,3 @@ const BriefForm: FC<{ base: string; csrf: string; brief: JobDetail['brief']; for
   )
 }
 
-export { EmptyState }

@@ -8,13 +8,16 @@ import { nowIso } from '../lib/db'
 import { readInput, clientIp } from '../lib/http'
 import { rateLimit } from '../lib/ratelimit'
 import { audit } from '../lib/audit'
-import { isState, STATES } from '../lib/state'
+import { isState } from '../lib/state'
 import * as jobs from '../services/jobs'
 import { assetResponse } from '../services/files'
 import { buildPrompt } from '../lib/prompt'
-import { LoginPage, QueuePage, MetricsPage, AuditPage, ProvidersPage, type QueueRow, type AuditRow, type QueueFilter, type Metric } from '../views/pages'
+import { LoginPage, QueuePage, MetricsPage, AuditPage, type AuditRow, type Metric } from '../views/pages'
+import { normalizeFilter, searchOrders } from '../services/search'
+import { loadThread } from '../services/assistant'
+import { getLlmSettings, providerStatus } from '../services/studio'
 import { JobPage, type JobDetail, type FormState } from '../views/job'
-import { QUEUE_VIEWS, AUDIT_TYPES, ERROR_MESSAGES, translateIssue, fieldKey, type QueueView } from '../views/labels'
+import { QUEUE_VIEWS, AUDIT_TYPES, ERROR_MESSAGES, translateIssue, fieldKey } from '../views/labels'
 import { STATE_LABEL_ID } from '../views/layout'
 import type { AppEnv, OperatorCtx } from '../types'
 
@@ -106,52 +109,9 @@ const base = (c: Context<AppEnv>) => ({
 
 consoleApp.get('/console', async (c) => {
   const b = base(c)
-  const viewParam = c.req.query('view')
-  const view = QUEUE_VIEWS.find((v) => v.id === viewParam)?.id as QueueView | undefined
-  const stateParam = c.req.query('state')
-  const state = !view && stateParam && isState(stateParam) ? stateParam : undefined
-  const mine = c.req.query('mine') === '1'
-  const q = (c.req.query('q') ?? '').trim().slice(0, 64)
-  const prioParam = c.req.query('prio') ?? ''
-  const prio = ['LOW', 'NORMAL', 'HIGH', 'URGENT'].includes(prioParam) ? prioParam : ''
-
-  const where: string[] = []
-  const params: unknown[] = []
-  if (view) {
-    const states = QUEUE_VIEWS.find((v) => v.id === view)!.states
-    where.push(`j.state IN (${states.map(() => '?').join(',')})`)
-    params.push(...states)
-  } else if (state) {
-    where.push('j.state = ?')
-    params.push(state)
-  } else {
-    where.push(`j.state NOT IN ('DELIVERED','CANCELLED')`)
-  }
-  if (mine) {
-    where.push('j.assigned_operator_id = ?')
-    params.push(b.op.id)
-  }
-  if (q) {
-    const like = `%${q.replace(/[\\%_]/g, (m) => '\\' + m)}%`
-    where.push(`(o.public_ref LIKE ? ESCAPE '\\' OR cu.display_name LIKE ? ESCAPE '\\')`)
-    params.push(like, like)
-  }
-  if (prio) {
-    where.push('j.priority = ?')
-    params.push(prio)
-  }
-  const [rows, countRows, mineRow] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT j.id, o.public_ref, o.service_code, j.state, j.priority, cu.display_name AS customer_name, op.display_name AS assignee_name,
-              j.assigned_operator_id, j.updated_at, j.created_at,
-              (SELECT CASE WHEN SUM(status = 'READY') > 0 THEN 'READY' WHEN COUNT(*) > 0 THEN 'DRAFT' END FROM prompt_versions pv WHERE pv.job_id = j.id) AS prompt_status,
-              (SELECT rights_confirmed FROM briefs b WHERE b.order_id = j.order_id) AS rights_confirmed
-       FROM jobs j JOIN orders o ON o.id = j.order_id JOIN customers cu ON cu.id = o.customer_id LEFT JOIN operators op ON op.id = j.assigned_operator_id
-       WHERE ${where.join(' AND ')}
-       ORDER BY CASE j.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END, j.created_at ASC LIMIT 200`
-    )
-      .bind(...params)
-      .all<QueueRow>(),
+  const filter = normalizeFilter(c.req.query())
+  const [res, countRows, mineRow] = await Promise.all([
+    searchOrders(c.env.DB, b.op, filter),
     c.env.DB.prepare('SELECT state, COUNT(*) AS n FROM jobs GROUP BY state').all<{ state: string; n: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) AS n FROM jobs WHERE assigned_operator_id = ? AND state NOT IN ('DELIVERED','CANCELLED')`).bind(b.op.id).first<{ n: number }>()
   ])
@@ -163,10 +123,7 @@ consoleApp.get('/console', async (c) => {
   }
   const viewCounts: Record<string, number> = {}
   for (const v of QUEUE_VIEWS) viewCounts[v.id] = v.states.reduce((a, st) => a + (byState[st] ?? 0), 0)
-  const filter: QueueFilter = { view, state, mine, q: q || undefined, prio: prio || undefined }
-  return c.html(
-    <QueuePage {...b} rows={rows.results} viewCounts={viewCounts} openCount={open} mineCount={mineRow?.n ?? 0} filter={filter} now={Date.now()} />
-  )
+  return c.html(<QueuePage {...b} result={res} viewCounts={viewCounts} openCount={open} mineCount={mineRow?.n ?? 0} now={Date.now()} />)
 })
 
 async function loadJobDetail(c: Context<AppEnv>, jobId: string): Promise<JobDetail> {
@@ -210,7 +167,9 @@ async function loadJobDetail(c: Context<AppEnv>, jobId: string): Promise<JobDeta
     .prepare(`SELECT COUNT(*) AS n, MAX(CASE WHEN status = 'READY' THEN version END) AS ready FROM prompt_versions WHERE job_id = ?`)
     .bind(jobId)
     .first<{ n: number; ready: number | null }>()
+  const [thread, llm] = await Promise.all([loadThread(db, c.get('operator') as OperatorCtx, jobId, 20), getLlmSettings(c.env)])
   return {
+    assistant: { thread, provider: providerStatus(c.env, llm) },
     job: row as JobDetail['job'],
     order: { public_ref: row.public_ref, service_code: row.service_code, customer_name: row.customer_name, customer_ref: row.customer_ref },
     brief: {
@@ -384,6 +343,6 @@ consoleApp.get('/console/audit', async (c) => {
   return c.html(<AuditPage {...b} rows={list} filter={{ type: type?.id, q: q || undefined }} nextBefore={nextBefore} now={Date.now()} />)
 })
 
-consoleApp.get('/console/providers', (c) => c.html(<ProvidersPage {...base(c)} />))
+// The former /console/providers page duplicated the Settings page; keep old links working.
+consoleApp.get('/console/providers', (c) => c.redirect('/console/settings', 301))
 
-export { STATES }

@@ -244,6 +244,28 @@ export function analyzeBriefRules(b: StudioBrief, workType: WorkTypeId): Gap[] {
   return g
 }
 
+/**
+ * Advisory conflict detection between brief fields (rules only, no LLM). A conflict is a
+ * pair of requirements that cannot both be satisfied as written; the operator decides.
+ */
+export type Conflict = { field: string; label: string; detail: string }
+export function detectConflicts(b: StudioBrief): Conflict[] {
+  const out: Conflict[] = []
+  const lc = (s: string) => s.toLowerCase()
+  const constraints = lc(b.constraints)
+  const asks = lc(`${b.objective} ${b.cta} ${b.product_facts}`)
+  const forbids = (topic: string) => new RegExp(`(tanpa|jangan|no|not|tidak boleh|dilarang|hindari|avoid)\\W+(?:\\w+\\W+){0,3}(${topic})`).test(constraints)
+  if (forbids('harga|diskon|promo|price|discount|potongan') && /(harga|diskon|promo|price|discount|potongan|rp\s?\d)/.test(asks))
+    out.push({ field: 'constraints', label: 'Harga / promo', detail: 'Batasan melarang menyebut harga atau promo, tetapi tujuan, CTA, atau fakta produk menyebutnya.' })
+  if (forbids('klaim|claim|health|kesehatan') && /(sehat|menyembuhkan|sembuh|obat|cure|heal|healthy|diet|langsing|imun)/.test(asks))
+    out.push({ field: 'constraints', label: 'Klaim kesehatan', detail: 'Batasan melarang klaim kesehatan, tetapi tujuan, CTA, atau fakta produk memuat kata yang terdengar seperti klaim kesehatan.' })
+  if (!b.rights_confirmed && b.references.length > 0)
+    out.push({ field: 'rights', label: 'Referensi tanpa hak', detail: `Ada ${b.references.length} referensi, tetapi hak atas materi belum dikonfirmasi pelanggan.` })
+  if (b.language === 'en' && /(bahasa indonesia|b\. indonesia|berbahasa indonesia)/.test(lc(`${b.constraints} ${b.tone} ${b.objective}`)))
+    out.push({ field: 'language', label: 'Bahasa', detail: 'Bahasa keluaran diisi Inggris, tetapi brief meminta Bahasa Indonesia.' })
+  return out
+}
+
 export function clarificationText(gaps: Gap[]): string {
   if (!gaps.length) return ''
   return [

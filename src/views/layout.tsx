@@ -1,13 +1,14 @@
 import type { Child, FC } from 'hono/jsx'
 import type { OperatorCtx } from '../types'
-import { STATE_LABEL, type JobState } from '../lib/state'
+import type { JobState } from '../lib/state'
 import { Icon, BrandMark, type IconName } from './icons'
 import { STATE_TONE, PRIORITY_LABEL, PRIORITY_TONE, ROLE_LABEL, fmtDateTime, type Tone } from './labels'
 
-export type NavKey = 'queue' | 'metrics' | 'audit' | 'providers' | 'settings' | 'none'
+export type NavKey = 'queue' | 'assistant' | 'metrics' | 'audit' | 'settings' | 'none'
 
 const NAV: { key: NavKey; href: string; label: string; icon: IconName; admin?: boolean }[] = [
   { key: 'queue', href: '/console', label: 'Inbox', icon: 'inbox' },
+  { key: 'assistant', href: '/console/assistant', label: 'Asisten', icon: 'message' },
   { key: 'settings', href: '/console/settings', label: 'Pengaturan', icon: 'sparkle' },
   { key: 'metrics', href: '/console/metrics', label: 'Metrik', icon: 'chart' },
   { key: 'audit', href: '/console/audit', label: 'Audit', icon: 'shield', admin: true }
@@ -130,8 +131,6 @@ export const STATE_LABEL_ID: Record<JobState, string> = {
   FAILED: 'Gagal',
   CANCELLED: 'Dibatalkan'
 }
-// Keep the original English labels available for code that still references them.
-export { STATE_LABEL }
 
 export const Flash: FC<{ ok?: string; err?: string }> = ({ ok, err }) => (
   <>
@@ -231,4 +230,3 @@ export const Time: FC<{ iso?: string | null; children?: Child }> = ({ iso, child
   )
 
 /** @deprecated kept for backwards compatibility with older views */
-export const fmt = fmtDateTime

@@ -269,6 +269,10 @@ export const StudioPage: FC<{
                     <Icon name="copy" size={16} />
                     <span data-copy-label>Salin prompt</span>
                   </button>
+                  <a class="btn btn-ghost btn-sm" href={`${base}/export?v=${st.latest.version}`} download>
+                    <Icon name="download" size={16} />
+                    Ekspor .md
+                  </a>
                 </div>
               </div>
               <div class="card-body">
@@ -393,6 +397,10 @@ export const StudioPage: FC<{
                   <Icon name="copy" size={16} />
                   <span data-copy-label>Salin v{viewing.version}</span>
                 </button>
+                <a class="btn btn-ghost btn-sm" href={`${base}/export?v=${viewing.version}`} download>
+                  <Icon name="download" size={16} />
+                  Ekspor v{viewing.version}
+                </a>
               </div>
             </Section>
           )}
