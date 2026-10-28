@@ -308,7 +308,7 @@ describe('file uploads (private R2)', () => {
     const { jobId } = await submit(env, 'cust_bigfile_01')
     const big = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'big.txt', { type: 'text/plain' })
     const res = await call(env, `/console/jobs/${jobId}/reference`, { method: 'POST', headers: { cookie: op.cookie, origin: BASE }, body: form(op, big) })
-    expect(decodeURIComponent(res.headers.get('location') ?? '')).toMatch(/err=.*exceeds/)
+    expect(decodeURIComponent(res.headers.get('location') ?? '')).toMatch(/err=.*melebihi batas 10 MB/)
   })
 })
 
@@ -325,6 +325,7 @@ describe('console pages & headers', () => {
     }
     const page = await (await call(env, `/console/jobs/${jobId}`, { headers: { cookie: op.cookie } })).text()
     expect(page).toContain('Sanitized prompt')
+    expect(page).toContain('Salin prompt')
     expect(page).not.toContain('<script>alert')
   })
 
@@ -334,6 +335,60 @@ describe('console pages & headers', () => {
     const html = await (await call(env, `/console/jobs/${jobId}`, { headers: { cookie: op.cookie } })).text()
     expect(html).not.toContain('<img src=x onerror=alert(1)>')
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+  })
+
+  it('queue supports grouped views, search and priority filter (no SQL wildcard injection)', async () => {
+    const a = await submit(env, 'cust_queue_srch1')
+    await submit(env, 'cust_queue_srch2')
+    const html = async (q: string) => (await call(env, `/console${q}`, { headers: { cookie: op.cookie } })).text()
+    expect(await html(`?q=${a.public_ref}`)).toContain(a.public_ref)
+    expect(await html('?q=%25')).toContain('Tidak ada yang cocok') // literal %, not "match everything"
+    expect(await html('?view=triage')).toContain(a.public_ref)
+    expect(await html('?view=review')).toContain('Tidak ada pekerjaan di sini')
+    expect(await html('?prio=URGENT')).not.toContain(a.public_ref)
+    expect(await html('?view=bogus')).toContain(a.public_ref) // unknown view falls back to all open
+  })
+
+  it('validation errors re-render the form with field errors and preserved values', async () => {
+    const { jobId } = await submit(env, 'cust_preserve01')
+    await internalPost(env, op, `/jobs/${jobId}/triage`, { action: 'start' })
+    const res = await call(env, `/console/jobs/${jobId}/brief`, {
+      method: 'POST',
+      headers: { cookie: op.cookie, origin: BASE, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _csrf: op.csrf, objective: 'short', audience: 'Audience kept intact', product_facts: 'Fakta produk yang cukup panjang', language: 'id' })
+    })
+    expect(res.status).toBe(422)
+    const page = await res.text()
+    expect(page).toContain('Audience kept intact') // value preserved
+    expect(page).toContain('Minimal 10 karakter') // Indonesian field error
+    expect(page).toContain('aria-invalid="true"')
+    // nothing was saved
+    const b = await env.DB.prepare('SELECT audience FROM briefs WHERE order_id = (SELECT order_id FROM jobs WHERE id = ?)').bind(jobId).first<{ audience: string }>()
+    expect(b!.audience).not.toBe('Audience kept intact')
+  })
+
+  it('audit can be filtered by type and correlation id', async () => {
+    await addOperator(env, 'admin2@example.test', 'ADMIN')
+    const a = (await login(env, 'admin2@example.test')) as Session & { ok: true }
+    const { jobId } = await submit(env, 'cust_auditflt1')
+    await internalPost(env, a, `/jobs/${jobId}/triage`, { action: 'start' })
+    const auth = await (await call(env, '/console/audit?type=auth', { headers: { cookie: a.cookie } })).text()
+    expect(auth).toContain('auth.login')
+    expect(auth).not.toContain('request.created')
+    const cid = (await env.DB.prepare(`SELECT correlation_id FROM audit_events WHERE action = 'request.created'`).first<{ correlation_id: string }>())!.correlation_id
+    const byCid = await (await call(env, `/console/audit?q=${cid.slice(0, 12)}`, { headers: { cookie: a.cookie } })).text()
+    expect(byCid).toContain('request.created')
+    expect(byCid).not.toContain('auth.login')
+  })
+
+  it('pages ship no inline scripts or inline styles (strict CSP compatible)', async () => {
+    const { jobId } = await submit(env, 'cust_csp_000001')
+    for (const p of ['/login', '/console', `/console/jobs/${jobId}`, '/console/metrics', '/console/providers']) {
+      const html = await (await call(env, p, { headers: { cookie: op.cookie } })).text()
+      expect(html, p).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/)
+      expect(html, p).not.toMatch(/\sstyle="/)
+      expect(html, p).not.toMatch(/\son[a-z]+="/)
+    }
   })
 
   it('health endpoint reveals nothing sensitive', async () => {

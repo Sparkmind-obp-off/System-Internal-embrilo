@@ -12,8 +12,10 @@ import { isState, STATES } from '../lib/state'
 import * as jobs from '../services/jobs'
 import { assetResponse } from '../services/files'
 import { buildPrompt } from '../lib/prompt'
-import { LoginPage, QueuePage, MetricsPage, AuditPage, ProvidersPage, type QueueRow, type AuditRow } from '../views/pages'
-import { JobPage, type JobDetail } from '../views/job'
+import { LoginPage, QueuePage, MetricsPage, AuditPage, ProvidersPage, type QueueRow, type AuditRow, type QueueFilter, type Metric } from '../views/pages'
+import { JobPage, type JobDetail, type FormState } from '../views/job'
+import { QUEUE_VIEWS, AUDIT_TYPES, ERROR_MESSAGES, translateIssue, fieldKey, type QueueView } from '../views/labels'
+import { STATE_LABEL_ID } from '../views/layout'
 import type { AppEnv, OperatorCtx } from '../types'
 
 export const consoleApp = new Hono<AppEnv>()
@@ -30,9 +32,9 @@ consoleApp.get('/login', (c) => {
   const e = c.req.query('err')
   const msg =
     e === 'expired'
-      ? 'The login form expired or your browser blocked its security cookie. Please try again (allow cookies for this site).'
+      ? 'Formulir masuk kedaluwarsa atau browser memblokir cookie keamanannya. Coba lagi, dan pastikan cookie diizinkan untuk situs ini.'
       : e
-        ? 'Invalid email or password, or account temporarily locked (5 failed attempts = 15 minutes).'
+        ? 'Email atau kata sandi salah, atau akun sedang dikunci sementara (5 kali salah = 15 menit).'
         : undefined
   return c.html(<LoginPage csrf={token} err={msg} />)
 })
@@ -104,11 +106,22 @@ const base = (c: Context<AppEnv>) => ({
 
 consoleApp.get('/console', async (c) => {
   const b = base(c)
-  const state = c.req.query('state')
+  const viewParam = c.req.query('view')
+  const view = QUEUE_VIEWS.find((v) => v.id === viewParam)?.id as QueueView | undefined
+  const stateParam = c.req.query('state')
+  const state = !view && stateParam && isState(stateParam) ? stateParam : undefined
   const mine = c.req.query('mine') === '1'
+  const q = (c.req.query('q') ?? '').trim().slice(0, 64)
+  const prioParam = c.req.query('prio') ?? ''
+  const prio = ['LOW', 'NORMAL', 'HIGH', 'URGENT'].includes(prioParam) ? prioParam : ''
+
   const where: string[] = []
   const params: unknown[] = []
-  if (state && isState(state)) {
+  if (view) {
+    const states = QUEUE_VIEWS.find((v) => v.id === view)!.states
+    where.push(`j.state IN (${states.map(() => '?').join(',')})`)
+    params.push(...states)
+  } else if (state) {
     where.push('j.state = ?')
     params.push(state)
   } else {
@@ -118,23 +131,40 @@ consoleApp.get('/console', async (c) => {
     where.push('j.assigned_operator_id = ?')
     params.push(b.op.id)
   }
-  const rows = await c.env.DB.prepare(
-    `SELECT j.id, o.public_ref, o.service_code, j.state, j.priority, cu.display_name AS customer_name, op.display_name AS assignee_name, j.updated_at, j.created_at
-     FROM jobs j JOIN orders o ON o.id = j.order_id JOIN customers cu ON cu.id = o.customer_id LEFT JOIN operators op ON op.id = j.assigned_operator_id
-     WHERE ${where.join(' AND ')}
-     ORDER BY CASE j.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END, j.created_at ASC LIMIT 200`
-  )
-    .bind(...params)
-    .all<QueueRow>()
-  const countRows = await c.env.DB.prepare('SELECT state, COUNT(*) AS n FROM jobs GROUP BY state').all<{ state: string; n: number }>()
-  const counts: Record<string, number> = {}
+  if (q) {
+    const like = `%${q.replace(/[\\%_]/g, (m) => '\\' + m)}%`
+    where.push(`(o.public_ref LIKE ? ESCAPE '\\' OR cu.display_name LIKE ? ESCAPE '\\')`)
+    params.push(like, like)
+  }
+  if (prio) {
+    where.push('j.priority = ?')
+    params.push(prio)
+  }
+  const [rows, countRows, mineRow] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT j.id, o.public_ref, o.service_code, j.state, j.priority, cu.display_name AS customer_name, op.display_name AS assignee_name,
+              j.assigned_operator_id, j.updated_at, j.created_at
+       FROM jobs j JOIN orders o ON o.id = j.order_id JOIN customers cu ON cu.id = o.customer_id LEFT JOIN operators op ON op.id = j.assigned_operator_id
+       WHERE ${where.join(' AND ')}
+       ORDER BY CASE j.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END, j.created_at ASC LIMIT 200`
+    )
+      .bind(...params)
+      .all<QueueRow>(),
+    c.env.DB.prepare('SELECT state, COUNT(*) AS n FROM jobs GROUP BY state').all<{ state: string; n: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS n FROM jobs WHERE assigned_operator_id = ? AND state NOT IN ('DELIVERED','CANCELLED')`).bind(b.op.id).first<{ n: number }>()
+  ])
+  const byState: Record<string, number> = {}
   let open = 0
   for (const r of countRows.results) {
-    counts[r.state] = r.n
+    byState[r.state] = r.n
     if (r.state !== 'DELIVERED' && r.state !== 'CANCELLED') open += r.n
   }
-  counts.__open = open
-  return c.html(<QueuePage {...b} rows={rows.results} counts={counts} filter={{ state: state && isState(state) ? state : undefined, mine }} />)
+  const viewCounts: Record<string, number> = {}
+  for (const v of QUEUE_VIEWS) viewCounts[v.id] = v.states.reduce((a, st) => a + (byState[st] ?? 0), 0)
+  const filter: QueueFilter = { view, state, mine, q: q || undefined, prio: prio || undefined }
+  return c.html(
+    <QueuePage {...b} rows={rows.results} viewCounts={viewCounts} openCount={open} mineCount={mineRow?.n ?? 0} filter={filter} now={Date.now()} />
+  )
 })
 
 async function loadJobDetail(c: Context<AppEnv>, jobId: string): Promise<JobDetail> {
@@ -198,12 +228,21 @@ async function loadJobDetail(c: Context<AppEnv>, jobId: string): Promise<JobDeta
 
 consoleApp.get('/console/jobs/:id', async (c) => {
   const b = base(c)
-  return c.html(<JobPage {...b} d={await loadJobDetail(c, c.req.param('id'))} />)
+  return c.html(<JobPage {...b} d={await loadJobDetail(c, c.req.param('id'))} now={Date.now()} />)
 })
 
-/** Form POST → service → redirect back (Post/Redirect/Get). Errors are shown as a flash message. */
+/** Human-readable (Indonesian) message for a safe AppError. */
+function errorText(e: AppError): string {
+  return ERROR_MESSAGES[e.code] ?? e.message
+}
+
+/**
+ * Form POST → service → redirect back (Post/Redirect/Get).
+ * Validation failures on a known form re-render the page (422) with field errors and the
+ * submitted values preserved, so operators never lose what they typed.
+ */
 type Action = (c: Context<AppEnv>, op: OperatorCtx, id: string, input: Record<string, unknown>, cid: string) => Promise<unknown>
-function formAction(okMsg: string, fn: Action, roles: OperatorCtx['role'][] = ['ADMIN', 'OPERATOR']) {
+function formAction(okMsg: string, fn: Action, roles: OperatorCtx['role'][] = ['ADMIN', 'OPERATOR'], formId?: (input: Record<string, unknown>) => string | undefined) {
   return async (c: Context<AppEnv>) => {
     const id = c.req.param('id') ?? ''
     const back = `/console/jobs/${encodeURIComponent(id)}`
@@ -216,25 +255,39 @@ function formAction(okMsg: string, fn: Action, roles: OperatorCtx['role'][] = ['
       return c.redirect(`${back}?ok=${encodeURIComponent(okMsg)}`, 303)
     } catch (e) {
       if (e instanceof AppError && e.status !== 401 && e.status !== 403 && e.status !== 404) {
-        const detail = e.details?.map((d) => `${d.field}: ${d.issue}`).join('; ')
-        return c.redirect(`${back}?err=${encodeURIComponent(detail ? `${e.message} — ${detail}` : e.message)}`, 303)
+        const fid = formId?.(input)
+        if (e.code === 'validation_failed' && fid && e.details?.length) {
+          const errors: Record<string, string> = {}
+          for (const d of e.details) {
+            const k = fieldKey(d.field)
+            if (!errors[k]) errors[k] = translateIssue(d.issue)
+          }
+          const values: Record<string, unknown> = {}
+          for (const [k, v] of Object.entries(input)) if (!(v instanceof File)) values[k] = v
+          const form: FormState = { id: fid, errors, values }
+          return c.html(
+            <JobPage op={op} csrf={c.get('csrf') as string} err={errorText(e)} d={await loadJobDetail(c, id)} form={form} now={Date.now()} />,
+            422
+          )
+        }
+        return c.redirect(`${back}?err=${encodeURIComponent(errorText(e))}`, 303)
       }
       throw e
     }
   }
 }
 
-consoleApp.post('/console/jobs/:id/triage', formAction('Triage updated', (c, op, id, i, cid) => jobs.triage(c.env.DB, op, id, i, cid)))
-consoleApp.post('/console/jobs/:id/assign', formAction('Assignment saved', (c, op, id, i, cid) => jobs.assign(c.env.DB, op, id, i, cid)))
-consoleApp.post('/console/jobs/:id/brief', formAction('Brief saved', (c, op, id, i, cid) => jobs.updateBrief(c.env.DB, op, id, i, cid)))
-consoleApp.post('/console/jobs/:id/start-production', formAction('Production run started — copy the prompt below', (c, op, id, i, cid) => jobs.startProduction(c.env.DB, op, id, i, cid)))
-consoleApp.post('/console/jobs/:id/production-result', formAction('Draft attached; job is in QC review', (c, op, id, i, cid) => jobs.recordProductionResult(c.env, op, id, i, cid)))
-consoleApp.post('/console/jobs/:id/production-failure', formAction('Provider failure recorded; job is recoverable', (c, op, id, i, cid) => jobs.recordProductionFailure(c.env.DB, op, id, i, cid)))
-consoleApp.post('/console/jobs/:id/requeue', formAction('Job returned to queue', (c, op, id, i, cid) => jobs.requeue(c.env.DB, op, id, i, cid)))
-consoleApp.post('/console/jobs/:id/review', formAction('Review recorded', (c, op, id, i, cid) => jobs.review(c.env, op, id, i, cid)))
-consoleApp.post('/console/jobs/:id/deliver', formAction('Delivered to customer', (c, op, id, _i, cid) => jobs.deliver(c.env.DB, op, id, cid)))
-consoleApp.post('/console/jobs/:id/reference', formAction('Reference uploaded', (c, op, id, i, cid) => jobs.addReference(c.env, op, id, i, cid)))
-consoleApp.post('/console/jobs/:id/cancel', formAction('Job cancelled', (c, op, id, i, cid) => jobs.cancel(c.env.DB, op, id, i, cid), ['ADMIN']))
+consoleApp.post('/console/jobs/:id/triage', formAction('Triase diperbarui', (c, op, id, i, cid) => jobs.triage(c.env.DB, op, id, i, cid), undefined, (i) => (i.action === 'needs_info' ? 'needs_info' : undefined)))
+consoleApp.post('/console/jobs/:id/assign', formAction('Penugasan disimpan', (c, op, id, i, cid) => jobs.assign(c.env.DB, op, id, i, cid)))
+consoleApp.post('/console/jobs/:id/brief', formAction('Brief disimpan', (c, op, id, i, cid) => jobs.updateBrief(c.env.DB, op, id, i, cid), undefined, () => 'brief'))
+consoleApp.post('/console/jobs/:id/start-production', formAction('Produksi dimulai — salin prompt di bawah', (c, op, id, i, cid) => jobs.startProduction(c.env.DB, op, id, i, cid)))
+consoleApp.post('/console/jobs/:id/production-result', formAction('Draf dilampirkan — pekerjaan masuk tinjauan QC', (c, op, id, i, cid) => jobs.recordProductionResult(c.env, op, id, i, cid), undefined, () => 'result'))
+consoleApp.post('/console/jobs/:id/production-failure', formAction('Kegagalan provider dicatat — pekerjaan tetap bisa dipulihkan', (c, op, id, i, cid) => jobs.recordProductionFailure(c.env.DB, op, id, i, cid), undefined, () => 'failure'))
+consoleApp.post('/console/jobs/:id/requeue', formAction('Pekerjaan dikembalikan ke antrean', (c, op, id, i, cid) => jobs.requeue(c.env.DB, op, id, i, cid)))
+consoleApp.post('/console/jobs/:id/review', formAction('Tinjauan QC dicatat', (c, op, id, i, cid) => jobs.review(c.env, op, id, i, cid), undefined, () => 'review'))
+consoleApp.post('/console/jobs/:id/deliver', formAction('Terkirim ke pelanggan', (c, op, id, _i, cid) => jobs.deliver(c.env.DB, op, id, cid)))
+consoleApp.post('/console/jobs/:id/reference', formAction('Referensi diunggah', (c, op, id, i, cid) => jobs.addReference(c.env, op, id, i, cid)))
+consoleApp.post('/console/jobs/:id/cancel', formAction('Pekerjaan dibatalkan', (c, op, id, i, cid) => jobs.cancel(c.env.DB, op, id, i, cid), ['ADMIN'], () => 'cancel'))
 
 // Private asset download for operators (every role may read; audited).
 consoleApp.get('/console/assets/:id', async (c) => {
@@ -262,19 +315,23 @@ consoleApp.get('/console/metrics', async (c) => {
     q<{ avg: number | null }>(`SELECT ROUND(AVG(m), 1) AS avg FROM (SELECT SUM(COALESCE(operator_minutes,0)) AS m FROM production_runs r JOIN jobs j ON j.id = r.job_id WHERE j.state = 'DELIVERED' GROUP BY r.job_id)`),
     db.prepare('SELECT state, COUNT(*) AS n FROM jobs GROUP BY state ORDER BY n DESC').all<{ state: string; n: number }>()
   ])
-  const pct = (a: number, t: number) => (t ? `${Math.round((a / t) * 100)}%` : '—')
+  const pct = (a: number, t: number) => (t ? `${Math.round((a / t) * 100)}%` : null)
+  const num = (v: number | null | undefined, unit = '') => (v === null || v === undefined ? null : `${String(v).replace('.', ',')}${unit}`)
+  const total = byState.results.reduce((a, r) => a + r.n, 0)
+  const metrics: Metric[] = [
+    { label: 'Pekerjaan terkirim', value: String(delivered.n), sample: `dari ${total} pekerjaan tercatat`, definition: 'Jumlah pekerjaan dengan status Terkirim saat ini.' },
+    { label: 'Rata-rata waktu kirim', value: num(ttd.h, ' jam'), sample: `${delivered.n} pekerjaan terkirim`, definition: 'Rata-rata selisih waktu antara permintaan masuk dan pengiriman terakhir, untuk pekerjaan yang sudah terkirim.' },
+    { label: 'Lolos QC pada draf pertama', value: pct(acceptance.first_pass ?? 0, acceptance.reviewed ?? 0), sample: `${acceptance.reviewed ?? 0} pekerjaan pernah ditinjau`, definition: 'Persentase pekerjaan yang tinjauan QC pertamanya langsung “Disetujui”.' },
+    { label: 'Rata-rata putaran revisi pelanggan', value: num(revisions.avg), sample: `${delivered.n} pekerjaan terkirim`, definition: 'Rata-rata jumlah revisi yang diminta pelanggan pada pekerjaan berstatus Terkirim.' },
+    { label: 'Tingkat kegagalan provider', value: pct(failures.failed ?? 0, failures.total ?? 0), sample: `${failures.total ?? 0} proses produksi`, definition: 'Persentase proses produksi yang berakhir Gagal atau Terhambat.' },
+    { label: 'Menit operator per pekerjaan terkirim', value: num(minutes.avg, ' mnt'), sample: 'berdasarkan menit yang diisi operator', definition: 'Rata-rata total menit kerja yang dicatat operator di semua proses produksi untuk pekerjaan yang sudah terkirim. Hanya akurat jika operator mengisi menit kerja.' }
+  ]
   return c.html(
     <MetricsPage
       {...b}
-      byState={byState.results}
-      m={{
-        'Delivered jobs': delivered.n,
-        'Avg time to deliver (hours)': ttd.h,
-        'First-draft QC acceptance': pct(acceptance.first_pass ?? 0, acceptance.reviewed ?? 0),
-        'Avg customer revision rounds (delivered)': revisions.avg,
-        'Provider failure rate (runs)': pct(failures.failed ?? 0, failures.total ?? 0),
-        'Avg operator minutes / delivered job': minutes.avg
-      }}
+      metrics={metrics}
+      total={total}
+      byState={byState.results.filter((r) => isState(r.state)).map((r) => ({ state: r.state as any, n: r.n, label: STATE_LABEL_ID[r.state as keyof typeof STATE_LABEL_ID] }))}
     />
   )
 })
@@ -282,10 +339,35 @@ consoleApp.get('/console/metrics', async (c) => {
 consoleApp.get('/console/audit', async (c) => {
   const b = base(c)
   requireRole(b.op, 'ADMIN')
+  const typeParam = c.req.query('type') ?? ''
+  const type = AUDIT_TYPES.find((t) => t.id === typeParam)
+  const q = (c.req.query('q') ?? '').trim().slice(0, 64)
+  const beforeParam = c.req.query('before') ?? ''
+  const before = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(beforeParam) ? beforeParam : ''
+  const where: string[] = []
+  const params: unknown[] = []
+  if (type) {
+    where.push('a.action LIKE ?')
+    params.push(`${type.prefix}%`)
+  }
+  if (q && /^[A-Za-z0-9_-]+$/.test(q)) {
+    where.push('(a.correlation_id LIKE ? OR a.resource_id LIKE ? OR a.actor_id LIKE ?)')
+    params.push(`${q}%`, `${q}%`, `${q}%`)
+  }
+  if (before) {
+    where.push('a.created_at < ?')
+    params.push(before)
+  }
+  const PAGE = 100
   const rows = await c.env.DB.prepare(
-    `SELECT a.*, op.display_name AS actor_name FROM audit_events a LEFT JOIN operators op ON op.id = a.actor_id ORDER BY a.created_at DESC, a.rowid DESC LIMIT 200`
-  ).all<AuditRow>()
-  return c.html(<AuditPage {...b} rows={rows.results} />)
+    `SELECT a.*, op.display_name AS actor_name FROM audit_events a LEFT JOIN operators op ON op.id = a.actor_id
+     ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY a.created_at DESC, a.rowid DESC LIMIT ${PAGE + 1}`
+  )
+    .bind(...params)
+    .all<AuditRow>()
+  const list = rows.results.slice(0, PAGE)
+  const nextBefore = rows.results.length > PAGE ? list[list.length - 1].created_at : undefined
+  return c.html(<AuditPage {...b} rows={list} filter={{ type: type?.id, q: q || undefined }} nextBefore={nextBefore} now={Date.now()} />)
 })
 
 consoleApp.get('/console/providers', (c) => c.html(<ProvidersPage {...base(c)} />))

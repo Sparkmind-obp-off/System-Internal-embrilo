@@ -21,7 +21,9 @@ Internal console for Embrilo's AI-assisted, human-reviewed content service. It r
 Details and evidence: [`docs/08-implementation-status.md`](docs/08-implementation-status.md). Connector contract: [`docs/09-connector-contract.md`](docs/09-connector-contract.md).
 
 ## Architecture
-- **Runtime:** Hono on Cloudflare Pages Functions (Workers runtime), TypeScript, server-rendered `hono/jsx` UI (no client framework, strict CSP, no inline JS).
+- **Runtime:** Hono on Cloudflare Pages Functions (Workers runtime), TypeScript, server-rendered `hono/jsx` UI (no client framework, strict CSP, no inline JS or inline styles).
+- **UI:** Indonesian-first design system in `public/static/console.css` (tokens, components, responsive down to 320px, reduced-motion). Copy/labels in `src/views/labels.ts`, icons (Lucide paths, ISC) in `src/views/icons.tsx`.
+- **Motion:** Anime.js **v4.5.0** bundled by esbuild from `src/client/console.ts` → `public/static/console.js` (generated, gitignored). Pages work fully without JavaScript.
 - **Data:** D1 (`DB`) for all records; private R2 (`R2`) for uploaded references and file drafts. Small text drafts are stored privately in D1.
 - **Layers:** `src/routes/console.tsx` (HTML console) and `src/routes/internal.ts` (JSON) both call `src/services/jobs.ts`; `src/lib/state.ts` is the single state-transition table; `src/routes/connector.ts` is the public server-to-server API.
 
@@ -79,8 +81,8 @@ pm2 start ecosystem.config.cjs           # or: npm run dev:sandbox
 ### Checks
 ```bash
 npm run typecheck     # tsc --noEmit
-npm test              # 62 Vitest tests against local D1 + R2 (Miniflare)
-npm run build         # vite → dist/_worker.js
+npm test              # 68 Vitest tests against local D1 + R2 (Miniflare)
+npm run build         # esbuild client bundle + vite → dist/_worker.js
 OPERATOR_EMAIL=… OPERATOR_PASSWORD=… BASE_URL=http://localhost:3000 node scripts/smoke.mjs   # 21-step E2E
 ```
 

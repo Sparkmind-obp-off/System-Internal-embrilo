@@ -62,3 +62,13 @@ End-to-end smoke test `scripts/smoke.mjs` (21 checks) passed against local `wran
 **Status: deployed and verified** at https://embrilo-os.pages.dev (login: `/login`).
 Note: the smoke test left one synthetic request (`EMB-AP2W7-GJ4FN`, customer "Smoke Test (synthetic)") in production; an admin can cancel it.
 Not yet done: Cloudflare Access in front of `/console*` and `/login` (recommended).
+
+## UI/UX upgrade (2026-10-28)
+- Redesigned every console route (login, queue, job detail, Produksi AI, metrics, audit, error pages) with a shared design system and Indonesian-first copy. Routes, server contracts, auth, CSRF, roles, state transitions, audit and connector behaviour are unchanged.
+- Queue: attention summary by real state groups, tabs (all open / mine / done), search by reference or customer (LIKE wildcards escaped), priority filter, next-action column, age with stale highlight.
+- Job detail: header with owner/age/next action, SVG workflow stepper, a single "next safe action" panel, guided 3-step manual Genspark handoff with copy confirmation, QC checklist, delivery confirmation checkbox, admin cancel with explicit confirmation, readable activity timeline.
+- Forms: on validation failure the page is re-rendered (HTTP 422) with Indonesian field-level errors and the submitted values preserved; focus moves to the first invalid field.
+- Metrics: definitions and sample sizes shown; "Belum ada data" is distinguished from zero; no targets are claimed.
+- Audit: filter by event type and correlation/resource id, paginated ("Muat kejadian lebih lama"), metadata collapsed.
+- Motion (Anime.js 4.5.0, `animate`, `createTimeline`, `stagger`, `createDrawable`): short entrance for headers/cards, staggered summary cards and first visible rows, stepper line drawing, metric bars, toast and flash feedback. Disabled entirely under `prefers-reduced-motion`; a CSS fallback reveals content after 1.5s if JS fails. Bundle: 41.7 KB minified / ~17 KB gzip (Anime.js ≈ 38 KB of it).
+- Verified: 68/68 tests; Playwright/Chromium QA at 1440, 375 and 320 px wide (no horizontal overflow, no console errors, reduced motion respected, first Tab reaches the skip link). Not verified: real-device testing on iOS/Android and screen-reader walkthroughs.

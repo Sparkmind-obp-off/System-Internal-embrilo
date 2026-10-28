@@ -29,3 +29,4 @@ logs/
 *.tar.gz
 *.zip
 .DS_Store
+public/static/console.js

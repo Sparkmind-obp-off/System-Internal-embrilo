@@ -188,7 +188,7 @@ export async function assign(db: D1Database, op: OperatorCtx, jobId: string, inp
   ])
 }
 
-const BRIEF_EDITABLE: JobState[] = ['SUBMITTED', 'TRIAGE', 'NEEDS_INFO', 'QUEUED', 'NEEDS_REVISION', 'BLOCKED_PROVIDER', 'FAILED']
+export const BRIEF_EDITABLE: JobState[] = ['SUBMITTED', 'TRIAGE', 'NEEDS_INFO', 'QUEUED', 'NEEDS_REVISION', 'BLOCKED_PROVIDER', 'FAILED']
 
 export async function updateBrief(db: D1Database, op: OperatorCtx, jobId: string, input: Record<string, unknown>, cid: string) {
   const job = await getJob(db, jobId)

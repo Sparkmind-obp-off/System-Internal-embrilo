@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "scripts": {
     "dev:sandbox": "wrangler pages dev dist --local --ip 0.0.0.0 --port 3000",
-    "build": "vite build",
+    "build": "mkdir -p .local && npm run build:client && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm run test && npm run build",
@@ -14,14 +14,17 @@
     "db:seed:local": "wrangler d1 execute embrilo-os-production --local --file=./seed/seed.sql",
     "db:reset:local": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed:local",
     "operator:sql": "node scripts/create-operator.mjs",
-    "clean-port": "fuser -k 3000/tcp 2>/dev/null || true"
+    "clean-port": "fuser -k 3000/tcp 2>/dev/null || true",
+    "build:client": "esbuild src/client/console.ts --bundle --format=esm --minify --target=es2020 --legal-comments=none --outfile=public/static/console.js --metafile=.local/client-meta.json"
   },
   "dependencies": {
+    "animejs": "^4.5.0",
     "hono": "^4.13.14"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260702.1",
     "@hono/vite-cloudflare-pages": "^0.4.3",
+    "esbuild": "^0.21.5",
     "miniflare": "^3.20250718.3",
     "typescript": "^5.9.3",
     "vite": "^5.4.21",
