@@ -113,3 +113,8 @@ Deployment record: see the "Deployment" section of `docs/08-implementation-statu
 
 ## Documentation
 `docs/00`–`07` (source of truth, research, architecture, data model, providers, security, roadmap, runbook), `docs/08-implementation-status.md`, `docs/09-connector-contract.md`, `docs/10-ux-redesign-spec.md`, `prompts/`.
+
+## Asisten order & pencarian (2026-10-28)
+- Inbox: pencarian (referensi, pelanggan, kata kunci brief) + filter status, layanan, prompt, revisi, tanggal, "perlu tindakan saya", serta paginasi.
+- Asisten (`/console/assistant` dan panel di halaman order): 7 alat baca, jawaban dari data nyata dengan daftar sumber. AI opsional, dan sarannya selalu diberi label. Perubahan data hanya lewat usulan yang dikonfirmasi operator dan tercatat di audit.
+- Ekspor prompt `.md` dari Prompt Studio. Detail lengkap: `docs/08-implementation-status.md`.
