@@ -108,4 +108,4 @@ Target: Cloudflare Pages via the owner's own Cloudflare account (BYOK). Checklis
 Deployment record: see the "Deployment" section of `docs/08-implementation-status.md`.
 
 ## Documentation
-`docs/00`–`07` (source of truth, research, architecture, data model, providers, security, roadmap, runbook), `docs/08-implementation-status.md`, `docs/09-connector-contract.md`, `prompts/`.
+`docs/00`–`07` (source of truth, research, architecture, data model, providers, security, roadmap, runbook), `docs/08-implementation-status.md`, `docs/09-connector-contract.md`, `docs/10-ux-redesign-spec.md`, `prompts/`.

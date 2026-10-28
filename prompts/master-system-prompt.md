@@ -25,6 +25,12 @@ Use the smallest reliable Cloudflare-first stack compatible with the actual repo
 
 Do not assume bindings, databases, buckets, domains, secrets or deployment projects exist. Inspect the environment and document what is missing. Do not introduce paid services or incur costs without explicit authorization.
 
+## 3.1. UI/UX quality bar
+
+Read `docs/10-ux-redesign-spec.md` and implement its design contract in the actual rendered UI, not only in documentation. The console must feel like a polished, premium operations product: calm forest-green and warm-neutral palette, consistent design tokens, strong hierarchy, precise spacing, refined responsive tables/cards, clear status chips, useful empty/error states and accessible focus treatment. Make the operator experience Indonesian-first and remove mixed-language UI copy. Prioritize the queue and job workspace: make the next safe action obvious without hiding operational detail. Avoid generic admin-template styling, raw debug-looking layouts, excessive decoration and unnecessary client-side frameworks.
+
+Preserve the current server-rendered Hono JSX architecture unless a measured requirement proves it insufficient. Preserve all existing routes, server-side authorization, CSRF, state-transition rules, audit writes, connector security and customer-scope checks. No inline scripts; keep assets compatible with the current CSP. A styling change is not complete until the actual build and tests pass and the rendered pages have been reviewed at mobile and desktop widths.
+
 ## 4. Required internal clusters
 1. **Operator access** — login/access protection, role checks, session safety.
 2. **Job queue and triage** — incoming requests, validation, missing-information status, priority and assignment.
