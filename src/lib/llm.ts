@@ -18,8 +18,15 @@ export const WORKERS_AI_MODELS = [
   { id: '@cf/meta/llama-3.1-8b-instruct-fp8-fast', label: 'Llama 3.1 8B (fp8-fast) — paling hemat', nIn: 4119, nOut: 34868 }
 ] as const
 export const DEFAULT_WORKERS_AI_MODEL = WORKERS_AI_MODELS[0].id
-/** Example from Groq's quickstart. Availability/pricing must be verified in the operator's Groq account. */
-export const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
+/** Groq chat models verified with a real call on the operator's account (GET /openai/v1/models +
+ *  one chat completion each) on 2026-10-28. `llama-3.3-70b-versatile` is NOT available there.
+ *  `reasoning` holds the documented per-model reasoning controls so tokens are not spent on hidden reasoning. */
+export const GROQ_MODELS = [
+  { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B — kualitas terbaik (diuji 28 Okt 2026)', reasoning: { reasoning_effort: 'low', include_reasoning: false } },
+  { id: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B — lebih ringan (diuji 28 Okt 2026)', reasoning: { reasoning_effort: 'low', include_reasoning: false } },
+  { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B (diuji 28 Okt 2026)', reasoning: { reasoning_effort: 'none' } }
+] as const
+export const DEFAULT_GROQ_MODEL = GROQ_MODELS[0].id
 export const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions'
 export const LLM_TIMEOUT_MS = 30_000
 export const MAX_INPUT_CHARS = 14_000
@@ -99,6 +106,8 @@ function classifyWorkersAiError(e: unknown): LlmError {
 /** Strips code fences/preambles and enforces size limits. Output stays untrusted text. */
 export function cleanOutput(raw: string): string {
   let t = raw.replace(/\r\n/g, '\n').trim()
+  // Some reasoning models wrap hidden reasoning in <think> tags; never keep it.
+  t = t.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
   const fence = t.match(/^```[a-z]*\n([\s\S]*?)\n```$/i)
   if (fence) t = fence[1].trim()
   t = t.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
@@ -139,7 +148,13 @@ export async function runLlm(
         r = await fetch(GROQ_ENDPOINT, {
           method: 'POST',
           headers: { authorization: `Bearer ${env.GROQ_API_KEY}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ model, messages: bounded, max_completion_tokens: maxTokens, temperature: 0.4 }),
+          body: JSON.stringify({
+            model,
+            messages: bounded,
+            max_completion_tokens: maxTokens,
+            temperature: 0.4,
+            ...(GROQ_MODELS.find((m) => m.id === model)?.reasoning ?? {})
+          }),
           signal: AbortSignal.timeout(LLM_TIMEOUT_MS)
         })
       } catch (e) {

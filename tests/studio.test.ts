@@ -258,7 +258,7 @@ describe('Prompt Studio — Workers AI provider (binding mocked)', () => {
     let r = await post(env, admin, '/console/settings/llm', {
       provider: 'workers_ai',
       workers_ai_model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-      groq_model: 'llama-3.3-70b-versatile',
+      groq_model: 'openai/gpt-oss-120b',
       max_output_tokens: '1800',
       daily_neuron_cap: '100',
       daily_groq_calls: '50'
@@ -281,7 +281,7 @@ describe('Prompt Studio — Groq provider (HTTP mocked)', () => {
     const r = await post(env, admin, '/console/settings/llm', {
       provider: 'groq',
       workers_ai_model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
-      groq_model: 'llama-3.3-70b-versatile',
+      groq_model: 'openai/gpt-oss-120b',
       max_output_tokens: '1500',
       daily_neuron_cap: '8000',
       daily_groq_calls: '50'
@@ -307,7 +307,9 @@ describe('Prompt Studio — Groq provider (HTTP mocked)', () => {
     expect(url).toBe('https://api.groq.com/openai/v1/chat/completions')
     expect(init.headers.authorization).toBe('Bearer gsk_test_key_that_is_long_enough_000')
     const body = JSON.parse(init.body)
-    expect(body.model).toBe('llama-3.3-70b-versatile')
+    expect(body.model).toBe('openai/gpt-oss-120b')
+    expect(body.reasoning_effort).toBe('low')
+    expect(body.include_reasoning).toBe(false)
     expect(body.max_completion_tokens).toBe(1500)
     expect((await versions(jobId))[0]).toMatchObject({ source: 'AI', provider: 'groq' })
     // The key never reaches the browser.
@@ -339,7 +341,7 @@ describe('Prompt Studio — Groq provider (HTTP mocked)', () => {
 
 describe('Settings', () => {
   it('only admins can change provider settings and work types; invalid values are rejected', async () => {
-    const fields = { provider: 'groq', workers_ai_model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', groq_model: 'llama-3.3-70b-versatile', max_output_tokens: '1800', daily_neuron_cap: '8000', daily_groq_calls: '50' }
+    const fields = { provider: 'groq', workers_ai_model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', groq_model: 'openai/gpt-oss-120b', max_output_tokens: '1800', daily_neuron_cap: '8000', daily_groq_calls: '50' }
     expect((await post(env, op, '/console/settings/llm', fields)).status).toBe(403)
     expect((await post(env, op, '/console/settings/work-types', { work_types: 'video_short' })).status).toBe(403)
     expect((await call(env, '/console/settings', { headers: { cookie: op.cookie } })).status).toBe(200)
@@ -348,6 +350,8 @@ describe('Settings', () => {
     let r = await post(env, admin, '/console/settings/llm', { ...fields, workers_ai_model: '@cf/evil/model' })
     expect(r.status).toBe(422)
     r = await post(env, admin, '/console/settings/llm', { ...fields, groq_model: 'bad model; drop' })
+    expect(r.status).toBe(422)
+    r = await post(env, admin, '/console/settings/llm', { ...fields, groq_model: 'llama-3.3-70b-versatile' }) // not available on this account
     expect(r.status).toBe(422)
     r = await post(env, admin, '/console/settings/llm', fields)
     expect(r.status).toBe(303)

@@ -24,6 +24,7 @@ import {
 import {
   DEFAULT_GROQ_MODEL,
   DEFAULT_WORKERS_AI_MODEL,
+  GROQ_MODELS,
   LlmError,
   WORKERS_AI_MODELS,
   analyzeMessages,
@@ -102,7 +103,7 @@ export async function saveLlmSettings(env: Bindings, op: OperatorCtx, input: Rec
   const v = new V()
   const provider = v.enumOf(input.provider, 'provider', ['template', 'workers_ai', 'groq'] as const)
   const wModel = v.enumOf(input.workers_ai_model, 'workers_ai_model', WORKERS_AI_MODELS.map((m) => m.id) as unknown as readonly string[])
-  const gModel = v.str(input.groq_model, 'groq_model', 3, 80, { pattern: /^[A-Za-z0-9._\/:-]+$/ })
+  const gModel = v.enumOf(input.groq_model, 'groq_model', GROQ_MODELS.map((m) => m.id) as unknown as readonly string[])
   const maxOut = v.int(input.max_output_tokens, 'max_output_tokens', 200, 4000)
   const neuronCap = v.int(input.daily_neuron_cap, 'daily_neuron_cap', 0, 1_000_000)
   const groqCalls = v.int(input.daily_groq_calls, 'daily_groq_calls', 0, 10_000)
@@ -156,7 +157,7 @@ export async function healthCheck(env: Bindings, op: OperatorCtx, input: Record<
       jobId: null,
       operation: 'health',
       actorId: op.id,
-      maxTokens: 12
+      maxTokens: 64 // reasoning models need a little headroom even for a one-word answer
     })
     await env.DB.batch([auditStmt(env.DB, opActor(op), 'ai.health_ok', 'settings', provider, cid, { model: r.model, ms: r.ms })])
     return { ok: true, model: r.model, ms: r.ms }

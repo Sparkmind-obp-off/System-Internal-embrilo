@@ -463,6 +463,7 @@ export const SettingsPage: FC<{
   enabledWorkTypes: string[]
   workTypes: WorkType[]
   workersAiModels: { id: string; label: string }[]
+  groqModels: { id: string; label: string }[]
   usage: { provider: string; calls: number; ok_calls: number; neurons: number; in_tok: number; out_tok: number }[]
 }> = (p) => {
   const admin = p.op.role === 'ADMIN'
@@ -548,8 +549,14 @@ export const SettingsPage: FC<{
                   ))}
                 </select>
               </Field>
-              <Field id="groq-model" label="Model Groq" hint="Contoh dari quickstart Groq; verifikasi ketersediaan di akun Anda.">
-                <input {...describe('groq-model', 'x')} type="text" name="groq_model" value={p.settings.groq_model} maxlength={80} disabled={!admin} />
+              <Field id="groq-model" label="Model Groq" hint="Hanya model yang sudah diuji di akun Groq ini. Periksa harga dan batas di Groq Console.">
+                <select {...describe('groq-model', 'x')} name="groq_model" disabled={!admin}>
+                  {p.groqModels.map((m) => (
+                    <option value={m.id} selected={m.id === p.settings.groq_model}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </div>
             <div class="form-row">

@@ -3,7 +3,7 @@ import { requireOperator, requireRole, verifyCsrf } from '../lib/auth'
 import { AppError } from '../lib/errors'
 import { readInput } from '../lib/http'
 import { WORK_TYPES } from '../lib/templates'
-import { WORKERS_AI_MODELS, usageToday } from '../lib/llm'
+import { GROQ_MODELS, WORKERS_AI_MODELS, usageToday } from '../lib/llm'
 import * as studio from '../services/studio'
 import { StudioPage, SettingsPage, type StudioForm } from '../views/studio'
 import { ERROR_MESSAGES, fieldKey, translateIssue } from '../views/labels'
@@ -121,6 +121,7 @@ async function renderSettings(c: Context<AppEnv>, extra: { ok?: string; err?: st
       enabledWorkTypes={enabled}
       workTypes={WORK_TYPES}
       workersAiModels={WORKERS_AI_MODELS as unknown as { id: string; label: string }[]}
+      groqModels={GROQ_MODELS as unknown as { id: string; label: string }[]}
       usage={usage}
     />,
     (extra.status ?? 200) as 200
