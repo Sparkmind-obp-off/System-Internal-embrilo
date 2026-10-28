@@ -70,36 +70,60 @@ Each generated prompt should, where relevant, include:
 
 Do not invent customer requirements, brand facts, prices, product claims, assets, or deadlines. Mark unknowns as unknown and ask targeted questions where needed. Keep source brief separate from generated assumptions. Use Indonesian by default unless the customer or task calls for another language.
 
-## LLM provider strategy
-### Default recommendation
-First evaluate **Cloudflare Workers AI** because the current stack is Cloudflare-oriented. It supports inference from Workers/Pages and has usage-based pricing. Verify the current model catalogue, account entitlement, billing status, limits, and pricing in the actual Cloudflare account and official docs before selecting a model. Do not assume any model or free allocation is available without verification.
+## LLM provider strategy — primary, fallback, and no-provider mode
+
+### Provider order
+Implement a small server-side provider adapter with this exact priority:
+1. **Cloudflare Workers AI** if the real app runtime/account has a valid AI binding, the chosen model is available, and a safe test succeeds.
+2. **Groq API** if Workers AI is unavailable, not enabled, incompatible, or fails a safe health/inference test and Groq has been configured by the operator.
+3. **Template-only mode** if neither provider is configured or available.
+
+Do not switch silently to a paid provider/model. Show which mode is active in private Settings and surface a clear, safe explanation when a provider is unavailable. The operator must be able to select the configured provider or choose template-only mode. Keep the adapter replaceable so a later provider can be added without rewriting Prompt Studio.
+
+### Cloudflare Workers AI
+First inspect the existing runtime and configuration. If the app runs on Cloudflare Pages Functions/Workers, verify whether an `AI` binding can be configured for that actual deployment. If it is a compatible Worker/Pages Function, use the server-side binding such as `env.AI.run(modelId, input)`. Do not assume the binding already exists merely because the app is hosted on Cloudflare Pages.
 
 Official references:
 - Workers AI: https://developers.cloudflare.com/workers-ai/
+- Workers AI bindings: https://developers.cloudflare.com/workers-ai/configuration/bindings/
 - Workers AI pricing: https://developers.cloudflare.com/workers-ai/platform/pricing/
-- AI Gateway: https://developers.cloudflare.com/ai-gateway/
 
-### Keep the provider replaceable
-Create a small server-side provider interface, for example:
+Verify model availability, current pricing, account entitlement, daily limits, and billing in the actual account before choosing a model. The official pricing page currently describes a daily free allocation and paid usage above that allocation, but availability and terms must be checked at implementation time. Some models require a paid billing method. Do not claim a particular model is free without verification.
+
+### Groq API fallback
+If Workers AI cannot be configured or does not meet the needs, support **Groq's server-side API** as the fallback. Groq Console is where the operator manages API access/keys; it is not itself the model endpoint. The deployed application must call Groq's documented API from its backend.
+
+- Official quickstart: https://console.groq.com/docs/quickstart
+- API reference: https://console.groq.com/docs/api-reference
+- Use the current documented chat-completions endpoint and an explicitly configured model ID supported by the account at implementation time.
+- Store the key as a server-side secret such as `GROQ_API_KEY` in Cloudflare secrets/environment settings. Never place it in source code, a browser bundle, a public variable, GitHub, screenshots, or a prompt.
+- Never ask the operator to paste a key into this chat or commit it. If a secret is missing, tell the operator exactly which dashboard setting to configure without exposing the value.
+- Before selecting a Groq model, verify its current availability, rate limits, token limits, terms, and pricing. Do not assume free access, unlimited use, or a stable model name.
+- Handle 401/403, 429, timeout, provider errors, malformed output, and network failures safely. Preserve the operator's draft and allow retry or template-only fallback.
+
+### Provider adapter and operations
+Create a small server-side interface, for example:
 - `generatePrompt(input)`
 - `refinePrompt(input)`
 - `analyzeBrief(input)`
+- `getProviderStatus()`
 
-Implement one provider first, only if a real binding/credential and account configuration are available. Use Cloudflare Workers AI binding where compatible with the existing runtime. If a compatible binding cannot be configured safely, keep a functioning template-only fallback and document the exact blocker. Do not hard-code an unverified model ID.
+Use Cloudflare Workers AI first when actually configured and healthy; otherwise use configured Groq only according to the explicit provider order/settings. Avoid automatic cross-provider retries that could unexpectedly incur cost or send customer data to another vendor. Any provider fallback that sends data to a different provider must be visible and controlled by the operator. Template-only mode must always remain available.
 
-Potential later option: Cloudflare AI Gateway for supported third-party providers, observability, routing, rate limits, or fallback. Do **not** add AI Gateway, multi-provider routing, Core Console, agent orchestration, vector database, or another paid service unless a demonstrated requirement justifies it.
+Cloudflare AI Gateway is a later optional layer for provider routing, observability, rate limits, caching, and unified billing where useful. Do not add AI Gateway, multi-provider orchestration, Core Console, agent orchestration, vector database, or any other paid service unless a demonstrated requirement justifies it.
 
-### Code editor LLM distinction
-An LLM embedded in a code editor can help the developer write and change code. It is not automatically callable by the deployed Embrilo OS. Runtime prompt generation must use an actual supported server-side model API/binding, or the template-only fallback. Never pretend that the editor’s model is an application API.
+### Code-editor LLM distinction
+An LLM embedded in a code editor can help the developer write and change code. It is not automatically callable by the deployed Embrilo OS. Runtime prompt generation must use a real supported server-side model API/binding or the template-only fallback. Never pretend the editor's model is an application API.
 
-### Cost and reliability guardrails
-- Set a conservative per-request input/output budget and a configurable daily usage cap if supported by the provider.
-- Enforce authentication, role checks, rate limiting, and server-side validation on generation endpoints.
-- Display provider/model state and safe errors; never expose keys or raw provider internals.
-- Use a bounded timeout, handle provider failure, and preserve the user's draft.
-- Avoid repeated model calls when a template or saved prompt is sufficient.
-- Log metadata such as order ID, model, success/failure, duration, and token/usage estimate where available. Do not log raw customer briefs or full prompts by default unless explicitly required and privacy-reviewed.
+### Cost, privacy, and reliability guardrails
+- Set conservative input/output token budgets and a configurable daily usage cap where supported.
+- Enforce authentication, role checks, CSRF protections, server-side validation, and rate limiting on generation endpoints.
+- Show active provider/model and safe errors in private Settings; never expose keys or raw provider internals.
+- Use bounded timeouts, handle failures, and preserve the user's draft.
+- Avoid model calls when a template or saved prompt is sufficient.
+- Log only minimum metadata such as order reference, provider/model, success/failure, duration, and usage estimate where available. Do not log raw customer briefs or full prompts by default unless explicitly required and privacy-reviewed.
 - Never automatically purchase credits or switch to a paid model without explicit operator configuration/approval.
+- Send only the minimum data needed to the selected provider. Make provider choice and external data transfer clear to the operator.
 - If no provider is configured, the app must remain useful through template-based prompt generation and manual editing.
 
 ## Data model
