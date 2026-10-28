@@ -11,6 +11,9 @@ export type Bindings = {
   CONNECTOR_HMAC_SECRET_PREVIOUS?: string
   CUSTOMER_TOKEN_SECRET?: string
   DOWNLOAD_SIGNING_SECRET?: string
+  // Optional AI providers for Prompt Studio (server-side only)
+  AI?: { run: (model: string, input: Record<string, unknown>) => Promise<unknown> }
+  GROQ_API_KEY?: string
 }
 
 export type OperatorCtx = {

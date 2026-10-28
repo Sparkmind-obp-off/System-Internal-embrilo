@@ -5,6 +5,7 @@ import { loadSession } from './lib/auth'
 import { connector } from './routes/connector'
 import { internal } from './routes/internal'
 import { consoleApp } from './routes/console'
+import { studioApp } from './routes/studio'
 import { ErrorPage } from './views/pages'
 import { ERROR_MESSAGES } from './views/labels'
 import type { AppEnv } from './types'
@@ -28,6 +29,7 @@ app.use('/logout', loadSession)
 app.use('/console', loadSession)
 app.use('/console/*', loadSession)
 app.route('/', consoleApp)
+app.route('/', studioApp)
 
 app.get('/', (c) => c.redirect('/console', 302))
 

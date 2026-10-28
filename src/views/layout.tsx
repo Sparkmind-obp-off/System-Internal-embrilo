@@ -4,11 +4,11 @@ import { STATE_LABEL, type JobState } from '../lib/state'
 import { Icon, BrandMark, type IconName } from './icons'
 import { STATE_TONE, PRIORITY_LABEL, PRIORITY_TONE, ROLE_LABEL, fmtDateTime, type Tone } from './labels'
 
-export type NavKey = 'queue' | 'metrics' | 'audit' | 'providers' | 'none'
+export type NavKey = 'queue' | 'metrics' | 'audit' | 'providers' | 'settings' | 'none'
 
 const NAV: { key: NavKey; href: string; label: string; icon: IconName; admin?: boolean }[] = [
-  { key: 'queue', href: '/console', label: 'Antrean', icon: 'inbox' },
-  { key: 'providers', href: '/console/providers', label: 'Produksi AI', icon: 'sparkle' },
+  { key: 'queue', href: '/console', label: 'Inbox', icon: 'inbox' },
+  { key: 'settings', href: '/console/settings', label: 'Pengaturan', icon: 'sparkle' },
   { key: 'metrics', href: '/console/metrics', label: 'Metrik', icon: 'chart' },
   { key: 'audit', href: '/console/audit', label: 'Audit', icon: 'shield', admin: true }
 ]
@@ -70,7 +70,7 @@ export const Layout: FC<{ title: string; op?: OperatorCtx; csrf?: string; active
           <main id="main" class="main" tabindex={-1}>
             {children}
             <footer class="app-foot">
-              Embrilo OS · konsol internal · semua tindakan tercatat di audit. Produksi Genspark berjalan secara <strong>manual-assisted</strong>.
+              Embrilo OS · konsol internal · semua tindakan tercatat di audit. Prompt disalin dan dijalankan secara <strong>manual</strong> di Genspark.ai atau alat AI lain.
             </footer>
           </main>
         </div>

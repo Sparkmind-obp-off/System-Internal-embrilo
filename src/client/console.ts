@@ -98,13 +98,14 @@ function setupCopy() {
       const target = document.querySelector<HTMLTextAreaElement>(btn.dataset.copy ?? '')
       if (!target) return
       const label = btn.querySelector<HTMLElement>('[data-copy-label]')
+      const original = label?.textContent ?? ''
       try {
         await navigator.clipboard.writeText(target.value)
         if (label) label.textContent = 'Tersalin'
         btn.classList.add('is-done')
-        toast('Prompt tersalin. Tempel di workspace Genspark Anda.')
+        toast(btn.dataset.copyToast ?? 'Prompt tersalin. Tempel di alat AI Anda — belum ada yang dieksekusi.')
         setTimeout(() => {
-          if (label) label.textContent = 'Salin prompt'
+          if (label) label.textContent = original
           btn.classList.remove('is-done')
         }, 2200)
       } catch {

@@ -94,6 +94,8 @@ export type QueueRow = {
   assigned_operator_id: string | null
   updated_at: string
   created_at: string
+  prompt_status: 'READY' | 'DRAFT' | null
+  rights_confirmed: number | null
 }
 
 export type QueueFilter = { view?: QueueView; state?: JobState; mine?: boolean; q?: string; prio?: string }
@@ -118,9 +120,9 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; viewCounts: Record<string,
   return (
     <Layout title="Antrean" op={p.op} csrf={p.csrf} active="queue">
       <PageHeader
-        eyebrow="Antrean kerja"
+        eyebrow="Inbox pesanan"
         title="Apa yang perlu dikerjakan sekarang"
-        description="Pekerjaan diurutkan berdasarkan prioritas, lalu yang paling lama menunggu. Buka pekerjaan untuk melihat langkah aman berikutnya."
+        description="Pesanan dari Embrilo Public masuk ke sini. Buka pesanan untuk memahami brief, lalu siapkan prompt di Prompt Studio dan jalankan secara manual."
       />
       <Flash ok={p.ok} err={p.err} />
 
@@ -205,6 +207,7 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; viewCounts: Record<string,
                   <th scope="col">Referensi</th>
                   <th scope="col">Status</th>
                   <th scope="col">Langkah berikutnya</th>
+                  <th scope="col">Prompt</th>
                   <th scope="col">Prioritas</th>
                   <th scope="col">Pemilik</th>
                   <th scope="col">Umur</th>
@@ -231,6 +234,18 @@ export const QueuePage: FC<Base & { rows: QueueRow[]; viewCounts: Record<string,
                           {na.who === 'customer' && <Icon name="clock" size={14} />}
                           {na.label}
                         </span>
+                      </td>
+                      <td data-label="Prompt">
+                        {r.prompt_status === 'READY' ? (
+                          <Chip tone="success">Siap</Chip>
+                        ) : r.prompt_status === 'DRAFT' ? (
+                          <Chip tone="neutral">Draf</Chip>
+                        ) : ['DELIVERED', 'CANCELLED', 'APPROVED', 'QC_REVIEW', 'IN_PRODUCTION'].includes(r.state) ? (
+                          <span class="muted small">—</span>
+                        ) : (
+                          <a class="small" href={`/console/jobs/${r.id}/studio`}>Siapkan</a>
+                        )}
+                        {r.rights_confirmed === 0 && <span class="cell-sub warn-text">Info kurang: hak materi</span>}
                       </td>
                       <td data-label="Prioritas">
                         <PriorityTag priority={r.priority} />

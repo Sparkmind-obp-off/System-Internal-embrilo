@@ -1,4 +1,4 @@
-# Embrilo OS — Internal Operations Console
+# Embrilo OS — Order-to-Prompt Workspace (internal)
 
 Internal console for Embrilo's AI-assisted, human-reviewed content service. It receives qualified requests from Public Embrilo, triages them, organizes production (Genspark **manual-assisted**), runs QC, handles revisions and authorizes delivery.
 
@@ -14,7 +14,9 @@ Internal console for Embrilo's AI-assisted, human-reviewed content service. It r
 | Audit trail + metrics | ✅ implemented · ✅ tested |
 | Public connector API v1 (HMAC, replay protection, idempotency, customer scope) | ✅ implemented · ✅ tested |
 | Private R2 uploads + short-lived download links | ✅ implemented · ✅ tested (local R2) |
-| Genspark automated API/connector/MCP | ⛔ **not verified** — no automated adapter exists |
+| Prompt Studio (brief → gaps → versioned prompt → copy → ready) | ✅ implemented · ✅ tested |
+| LLM providers: Workers AI → Groq → template-only (explicit choice) | ✅ implemented · ✅ tested with mocks; live status in `docs/08` |
+| Genspark automated API/connector/MCP | ⛔ **not verified** — prompts are copied and run manually |
 | Cloudflare Access in front of the console | ⏳ not configured (recommended) |
 | Production deployment | ✅ https://embrilo-os.pages.dev — deployed and smoke-tested 2026-10-27 |
 
@@ -57,6 +59,8 @@ Bindings (`wrangler.jsonc`): `DB` (D1 `embrilo-os-production`), `R2` (bucket `em
 
 Vars: `APP_ENV`, `CONNECTOR_KEY_ID` (default `public-embrilo-v1`), `MAX_REVISION_ROUNDS` (default `2`).
 
+Optional AI: Pages binding `AI` (Workers AI, in `wrangler.jsonc`) and secret `GROQ_API_KEY` (Groq; set in Cloudflare → Workers & Pages → embrilo-os → Settings → Variables and Secrets, never in Git). Without either, Prompt Studio runs in template-only mode.
+
 Secrets (names only; each must be ≥32 random chars):
 - `CONNECTOR_HMAC_SECRET` (shared only with Public Embrilo's server)
 - `CONNECTOR_HMAC_SECRET_PREVIOUS` (optional, for rotation)
@@ -81,7 +85,7 @@ pm2 start ecosystem.config.cjs           # or: npm run dev:sandbox
 ### Checks
 ```bash
 npm run typecheck     # tsc --noEmit
-npm test              # 68 Vitest tests against local D1 + R2 (Miniflare)
+npm test              # 85 Vitest tests against local D1 + R2 (Miniflare)
 npm run build         # esbuild client bundle + vite → dist/_worker.js
 OPERATOR_EMAIL=… OPERATOR_PASSWORD=… BASE_URL=http://localhost:3000 node scripts/smoke.mjs   # 21-step E2E
 ```

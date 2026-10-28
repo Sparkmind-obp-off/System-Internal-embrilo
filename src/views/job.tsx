@@ -71,6 +71,8 @@ export type JobDetail = {
   operators: { id: string; display_name: string }[]
   draftPreview: string | null
   prompt: string | null
+  promptSource: string | null
+  studio: { versions: number; readyVersion: number | null }
   maxRevisions: number
   r2Configured: boolean
 }
@@ -124,6 +126,11 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
           <div class="job-header-chips">
             <StateBadge state={s} />
             <PriorityTag priority={job.priority} />
+            <a class="btn btn-secondary btn-sm" href={`${base}/studio`}>
+              <Icon name="sparkle" size={16} />
+              Prompt Studio
+              {d.studio.readyVersion ? ` · v${d.studio.readyVersion} siap` : d.studio.versions ? ` · ${d.studio.versions} draf` : ''}
+            </a>
           </div>
         </div>
         <dl class="job-meta">
@@ -281,6 +288,15 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                         Pekerjaan aman dan bisa dicoba lagi. Lihat catatan kegagalan di “Riwayat produksi”.
                       </Alert>
                     )}
+                    {d.studio.readyVersion ? (
+                      <Alert tone="success" title={`Prompt Studio v${d.studio.readyVersion} siap dieksekusi`} icon="check">
+                        Produksi akan memakai versi ini dan mencatatnya sebagai sumber prompt. <a href={`${base}/studio`}>Buka Prompt Studio</a>
+                      </Alert>
+                    ) : (
+                      <Alert tone="info" title="Belum ada prompt yang ditandai siap" icon="sparkle">
+                        Disarankan: susun dan tinjau prompt di <a href={`${base}/studio`}>Prompt Studio</a>, lalu tandai siap. Tanpa itu, produksi memakai template standar.
+                      </Alert>
+                    )}
                     <form method="post" action={`${base}/start-production`} class="stack">
                       <Csrf token={csrf} />
                       <Field id="start-provider" label="Cara produksi" hint="Belum ada otomatisasi Genspark yang terverifikasi — semua mode adalah serah-terima manual.">
@@ -321,7 +337,7 @@ export const JobPage: FC<{ op: OperatorCtx; csrf: string; ok?: string; err?: str
                           <div class="prompt-box">
                             <div class="prompt-head">
                               <span class="small">
-                                Sanitized prompt · <code class="code-soft">{runningRun.template_version}</code> · digest{' '}
+                                Sanitized prompt · {d.promptSource} · <code class="code-soft">{runningRun.template_version}</code> · digest{' '}
                                 <code class="code-soft">{runningRun.input_digest.slice(0, 12)}</code>
                               </span>
                               <button type="button" class="btn btn-secondary btn-sm" data-copy="#prompt-text" hidden>

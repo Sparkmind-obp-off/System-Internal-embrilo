@@ -143,7 +143,9 @@ consoleApp.get('/console', async (c) => {
   const [rows, countRows, mineRow] = await Promise.all([
     c.env.DB.prepare(
       `SELECT j.id, o.public_ref, o.service_code, j.state, j.priority, cu.display_name AS customer_name, op.display_name AS assignee_name,
-              j.assigned_operator_id, j.updated_at, j.created_at
+              j.assigned_operator_id, j.updated_at, j.created_at,
+              (SELECT CASE WHEN SUM(status = 'READY') > 0 THEN 'READY' WHEN COUNT(*) > 0 THEN 'DRAFT' END FROM prompt_versions pv WHERE pv.job_id = j.id) AS prompt_status,
+              (SELECT rights_confirmed FROM briefs b WHERE b.order_id = j.order_id) AS rights_confirmed
        FROM jobs j JOIN orders o ON o.id = j.order_id JOIN customers cu ON cu.id = o.customer_id LEFT JOIN operators op ON op.id = j.assigned_operator_id
        WHERE ${where.join(' AND ')}
        ORDER BY CASE j.priority WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END, j.created_at ASC LIMIT 200`
@@ -195,9 +197,19 @@ async function loadJobDetail(c: Context<AppEnv>, jobId: string): Promise<JobDeta
   }
   // Re-render the sanitized prompt for a running run (deterministic from brief + template).
   let prompt: string | null = null
+  let promptSource: string | null = null
   if (row.state === 'IN_PRODUCTION') {
-    prompt = buildPrompt(await jobs.loadPromptBrief(db, jobId))
+    const run = runs.results.find((r: any) => r.status === 'RUNNING')
+    const pv = run?.prompt_version_id
+      ? await db.prepare('SELECT version, body FROM prompt_versions WHERE id = ?').bind(run.prompt_version_id).first<{ version: number; body: string }>()
+      : null
+    prompt = pv ? pv.body : buildPrompt(await jobs.loadPromptBrief(db, jobId))
+    promptSource = pv ? `Prompt Studio v${pv.version}` : 'template lama (tanpa Prompt Studio)'
   }
+  const studioSummary = await db
+    .prepare(`SELECT COUNT(*) AS n, MAX(CASE WHEN status = 'READY' THEN version END) AS ready FROM prompt_versions WHERE job_id = ?`)
+    .bind(jobId)
+    .first<{ n: number; ready: number | null }>()
   return {
     job: row as JobDetail['job'],
     order: { public_ref: row.public_ref, service_code: row.service_code, customer_name: row.customer_name, customer_ref: row.customer_ref },
@@ -221,6 +233,8 @@ async function loadJobDetail(c: Context<AppEnv>, jobId: string): Promise<JobDeta
     operators: operators.results,
     draftPreview,
     prompt,
+    promptSource,
+    studio: { versions: studioSummary?.n ?? 0, readyVersion: studioSummary?.ready ?? null },
     maxRevisions: jobs.maxRevisions(c.env),
     r2Configured: !!c.env.R2
   }

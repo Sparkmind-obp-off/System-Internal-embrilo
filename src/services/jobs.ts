@@ -9,6 +9,8 @@ import { stableStringify, PRIORITIES, V, validateBrief, type BriefInput, type Pu
 import type { JobState } from '../lib/state'
 import type { Actor, Bindings, OperatorCtx } from '../types'
 import { storeFile, type StoredFile } from './files'
+import { readyPrompt } from './studio'
+import { promptDigest } from '../lib/prompt'
 
 const opActor = (op: OperatorCtx): Actor => ({ type: 'OPERATOR', id: op.id })
 export const maxRevisions = (env: Bindings) => {
@@ -266,7 +268,11 @@ export async function startProduction(db: D1Database, op: OperatorCtx, jobId: st
   const job = await getJob(db, jobId)
   const running = await db.prepare(`SELECT id FROM production_runs WHERE job_id = ? AND status = 'RUNNING'`).bind(jobId).first()
   if (running) throw new AppError(409, 'run_in_progress', 'A production run is already in progress for this job')
-  const prepared = await provider.prepare(await loadPromptBrief(db, jobId))
+  // Prefer the operator-approved Prompt Studio version (status READY); fall back to the legacy template.
+  const ready = await readyPrompt(db, jobId)
+  const prepared = ready
+    ? { prompt: ready.body, digest: await promptDigest(ready.body), templateVersion: ready.template_id }
+    : await provider.prepare(await loadPromptBrief(db, jobId))
   const runId = uuid()
   await transition(db, {
     job,
@@ -275,7 +281,7 @@ export async function startProduction(db: D1Database, op: OperatorCtx, jobId: st
     cid,
     reason: `run ${provider.id}`,
     set: { attempts: job.attempts + 1, assigned_operator_id: job.assigned_operator_id ?? op.id },
-    auditMeta: { run_id: runId, provider: provider.id, mode: provider.mode },
+    auditMeta: { run_id: runId, provider: provider.id, mode: provider.mode, prompt_version: ready?.version ?? null },
     extra: (g) => [
       guardedInsert(
         db,
@@ -289,13 +295,14 @@ export async function startProduction(db: D1Database, op: OperatorCtx, jobId: st
           status: 'RUNNING',
           input_digest: prepared.digest,
           operator_id: op.id,
+          prompt_version_id: ready?.id ?? null,
           started_at: nowIso()
         },
         g
       )
     ]
   })
-  return { run_id: runId, prompt: prepared.prompt, provider: provider.id, mode: provider.mode }
+  return { run_id: runId, prompt: prepared.prompt, provider: provider.id, mode: provider.mode, prompt_version: ready?.version ?? null }
 }
 
 type RunRow = { id: string; job_id: string; status: string; provider: string; input_digest: string }

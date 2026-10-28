@@ -20,6 +20,9 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Workers AI (Prompt Studio). Free allocation: 10,000 Neurons/day; the app caps itself at
+  // 8,000 estimated Neurons/day by default (Pengaturan). No paid model is used by default.
+  "ai": { "binding": "AI" },
   "r2_buckets": [
     { "binding": "R2", "bucket_name": "embrilo-os-private" }
   ]

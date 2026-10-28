@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { Miniflare } from 'miniflare'
 import app from '../src/index'
 import { hashPassword } from '../src/lib/crypto'
@@ -22,7 +22,12 @@ export async function setupEnv(opts: { r2?: boolean } = {}) {
   })
   const DB = (await mf.getD1Database('DB')) as unknown as D1Database
   const R2 = (await mf.getR2Bucket('R2')) as unknown as R2Bucket
-  const sql = readFileSync(new URL('../migrations/0001_initial_schema.sql', import.meta.url), 'utf8')
+  const dir = new URL('../migrations/', import.meta.url)
+  const sql = readdirSync(dir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+    .map((f) => readFileSync(new URL(f, dir), 'utf8'))
+    .join('\n;\n')
   const statements = sql
     .split('\n')
     .map((l) => l.replace(/--.*$/, ''))
